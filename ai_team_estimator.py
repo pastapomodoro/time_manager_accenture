@@ -144,7 +144,10 @@ col_job, col_team = st.columns([3, 2])
 
 with col_job:
     st.subheader("Job da stimare")
-    st.caption("Imposta la quantità solo per le lavorazioni necessarie; lascia 0 le altre.")
+    st.caption(
+        "Imposta la **Quantità** (colonna evidenziata e bloccata in vista) solo dove serve; "
+        "lascia 0 le altre righe."
+    )
 
     _base = df_lav[
         [
@@ -173,42 +176,44 @@ with col_job:
     _n = len(df_edit)
     _editor_height = int(72 + 38 * _n)
 
-    edited = st.data_editor(
-        df_edit,
-        column_config={
-            "tipologia_id": st.column_config.TextColumn("ID", width="small"),
-            "nome_lavorazione": st.column_config.TextColumn(
-                "Lavorazione", width="large"
-            ),
-            "quantita": st.column_config.NumberColumn(
-                "Quantità",
-                min_value=0,
-                step=1,
-                default=0,
-                width="small",
-                help="Quantità da stimare per questa riga",
-            ),
-            "categoria": st.column_config.TextColumn("Cat.", width="small"),
-            "sottocategoria": st.column_config.TextColumn(
-                "Sottocategoria", width="medium"
-            ),
-            "variante": st.column_config.TextColumn("Variante", width="medium"),
-            "asset_per_giorno": st.column_config.NumberColumn(
-                "Asset/gg", width="small", format="%d"
-            ),
-        },
-        disabled=[
-            "tipologia_id",
-            "nome_lavorazione",
-            "categoria",
-            "sottocategoria",
-            "variante",
-            "asset_per_giorno",
-        ],
-        hide_index=True,
-        use_container_width=True,
-        height=_editor_height,
-    )
+    with st.container(border=True, key="job_qty_editor"):
+        edited = st.data_editor(
+            df_edit,
+            column_config={
+                "tipologia_id": st.column_config.TextColumn("ID", width="small"),
+                "nome_lavorazione": st.column_config.TextColumn(
+                    "Lavorazione", width="large"
+                ),
+                "quantita": st.column_config.NumberColumn(
+                    "Quantità",
+                    min_value=0,
+                    step=1,
+                    default=0,
+                    width=120,
+                    pinned=True,
+                    help="Unico campo modificabile: quantità da stimare per la riga.",
+                ),
+                "categoria": st.column_config.TextColumn("Cat.", width="small"),
+                "sottocategoria": st.column_config.TextColumn(
+                    "Sottocategoria", width="medium"
+                ),
+                "variante": st.column_config.TextColumn("Variante", width="medium"),
+                "asset_per_giorno": st.column_config.NumberColumn(
+                    "Asset/gg", width="small", format="%d"
+                ),
+            },
+            disabled=[
+                "tipologia_id",
+                "nome_lavorazione",
+                "categoria",
+                "sottocategoria",
+                "variante",
+                "asset_per_giorno",
+            ],
+            hide_index=True,
+            use_container_width=True,
+            height=_editor_height,
+        )
 
     # Costruisci job_items usando l'indice numerico (immune a tipologia_id non univoci)
     job_items = []

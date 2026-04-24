@@ -57,6 +57,14 @@ def inject_theme() -> None:
         border-radius: 8px;
         overflow: hidden;
     }
+    /* Area compilazione: container con key=job_qty_editor (vedi ai_team_estimator) */
+    div.st-key-job_qty_editor {
+        border: 2px solid #6D28D9 !important;
+        background: rgba(109, 40, 217, 0.07) !important;
+        border-radius: 12px !important;
+        padding: 0.65rem 0.75rem 0.85rem !important;
+        box-shadow: inset 0 0 0 1px rgba(109, 40, 217, 0.12);
+    }
 </style>
         """,
         unsafe_allow_html=True,
