@@ -227,7 +227,7 @@ giorni_effort = ore_effort_tot / ORE_GIORNATA
 # Durata calendar: capacità team coinvolto (giorni lavorativi)
 nomi_coinvolti = {n for it in job_items for n in it["assigned"]}
 cap_h_sett     = df_team[df_team["nome"].isin(nomi_coinvolti)]["disponibilita_h_settimana"].sum()
-giorni_cal     = (ore_tot_tot / cap_h_sett * 5) if cap_h_sett > 0 else None  # giorni lun-ven
+giorni_cal     = (ore_reali_tot / cap_h_sett * 5) if cap_h_sett > 0 else None  # giorni lun-ven
 
 # Metriche
 m1, m2, m3, m4 = st.columns(4)
