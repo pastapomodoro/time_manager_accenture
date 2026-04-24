@@ -9,6 +9,8 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from streamlit_theme import inject_theme
+
 # Costanti (validare con standard Accenture)
 ORE_LAVORATIVE_GIORNO = 7.5
 OVERHEAD_DEFAULT = 1.3
@@ -65,8 +67,9 @@ def _skill_match(richiesta: str, resource_tags: set[str]) -> bool:
 
 def main() -> None:
     st.set_page_config(page_title="CM1 Estimator", layout="wide")
+    inject_theme()
     st.title("CM1 Estimator")
-    st.caption("Stima tempi e costi da `tempistiche.xlsx` e `risorse.xlsx`.")
+    st.caption("Stima tempi e costi da Excel: tempistiche (foglio lavorazioni) e risorse (foglio team).")
 
     with st.sidebar:
         st.subheader("File Excel")

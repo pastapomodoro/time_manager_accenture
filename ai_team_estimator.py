@@ -11,10 +11,13 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
+from streamlit_theme import inject_theme
+
 # ============================================================
 # CONFIG
 # ============================================================
-st.set_page_config(page_title="AI_Team Estimator", page_icon="⏱️", layout="wide")
+st.set_page_config(page_title="AI Team Estimator", layout="wide")
+inject_theme()
 
 OVERHEAD_DEFAULT = 1.3
 ORE_GIORNATA = 8  # standard tariffario (1 MD = 8 ore)
@@ -97,15 +100,15 @@ def skill_gap(job_items, risorse):
 # ============================================================
 # UI
 # ============================================================
-st.title("⏱️ AI_Team Estimator")
-st.caption("Stima tempi e costi — logica tariffario AI_Team (asset/giorno · 8h/MD)")
+st.title("AI Team Estimator")
+st.caption("Stima tempi e costi — tariffario AI_Team (asset/giorno, 8 h/MD).")
 
 with st.sidebar:
-    st.header("📂 Dati")
+    st.header("Dati")
 
     # Auto-load se il file è nella stessa cartella
     if os.path.exists(DEFAULT_XLSX):
-        st.success(f"✅ `ai_team_data.xlsx` caricato automaticamente")
+        st.success("`ai_team_data.xlsx` caricato automaticamente.")
         with st.expander("Usa un file diverso"):
             file_data = st.file_uploader("Sostituisci ai_team_data.xlsx", type=["xlsx"])
         if file_data is None:
@@ -119,7 +122,7 @@ with st.sidebar:
         file_bytes = file_data.getvalue() if file_data else None
 
     st.divider()
-    st.header("⚙️ Parametri")
+    st.header("Parametri")
     overhead = st.slider(
         "Overhead (riunioni, rework, buffer)",
         1.0, 2.0, OVERHEAD_DEFAULT, 0.05,
@@ -127,7 +130,7 @@ with st.sidebar:
     )
 
 if file_bytes is None:
-    st.info("👈 Carica ai_team_data.xlsx nella sidebar per iniziare")
+    st.info("Carica **ai_team_data.xlsx** dalla barra laterale per iniziare.")
     st.stop()
 
 try:
@@ -140,8 +143,8 @@ except ValueError as e:
 col_job, col_team = st.columns([3, 2])
 
 with col_job:
-    st.subheader("📋 Job da stimare")
-    st.caption("Metti la quantità per le lavorazioni che ti servono. Le altre lasciale a 0.")
+    st.subheader("Job da stimare")
+    st.caption("Imposta la quantità solo per le lavorazioni necessarie; lascia 0 le altre.")
 
     df_edit = df_lav[["tipologia_id", "categoria", "sottocategoria",
                        "nome_lavorazione", "variante", "asset_per_giorno"]].copy()
@@ -181,8 +184,8 @@ with col_job:
             })
 
 with col_team:
-    st.subheader("👥 Team")
-    st.caption("Seleziona le risorse assegnate")
+    st.subheader("Team")
+    st.caption("Seleziona le risorse assegnate al job.")
 
     has_ruolo = "ruolo" in df_team.columns
     nomi = st.multiselect(
@@ -217,11 +220,11 @@ if risorse.empty:
 
 gap = skill_gap(job_items, risorse)
 if gap:
-    st.warning(f"⚠️ Skill richieste ma non coperte dal team: **{', '.join(gap)}**")
+    st.warning(f"Skill richieste ma non coperte dal team: **{', '.join(gap)}**")
 
 res = calcola(job_items, risorse, overhead)
 
-st.subheader("📊 Stima")
+st.subheader("Stima")
 m1, m2, m3, m4 = st.columns(4)
 m1.metric(
     "Ore totali",
@@ -234,7 +237,7 @@ m3.metric("Costo", f"€ {res['costo']:,.0f}")
 if res["settimane"]:
     m4.metric("Durata calendar", f"{res['settimane']:.1f} sett.")
 
-with st.expander("🔍 Breakdown per lavorazione"):
+with st.expander("Breakdown per lavorazione"):
     df_break = pd.DataFrame([
         {
             "Lavorazione": f"{it['nome']} — {it['variante']}" if it["variante"] else it["nome"],
