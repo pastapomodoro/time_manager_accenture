@@ -1,7 +1,6 @@
 """
-AI_Team Estimator v2 — Tool di stima tempi e costi per AI_Team (AI team, Accenture Song).
-Legge ai_team_data.xlsx con fogli 'lavorazioni' e 'team'.
-Logica: asset_per_giorno, 1 MD = 8h.
+AI_Team Estimator — stima tempi e costi per AI_Team, Accenture Song.
+Logica: minuti per unità (editabile per progetto), 8h/giorno lavorativo.
 
 Run: python3 -m streamlit run ai_team_estimator.py
 """
@@ -11,42 +10,36 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
-# ============================================================
-# CONFIG
-# ============================================================
+# ── CONFIG ────────────────────────────────────────────────────
 st.set_page_config(page_title="AI Team Estimator", page_icon="⏱️", layout="wide")
 
 OVERHEAD_DEFAULT = 1.3
-ORE_GIORNATA = 8
+ORE_GIORNATA = 8.0          # ore per giornata lavorativa
+MINUTI_GIORNATA = ORE_GIORNATA * 60
 DEFAULT_XLSX = os.path.join(os.path.dirname(__file__), "ai_team_data.xlsx")
 
-PALETTE = [
-    "#7C3AED", "#2563EB", "#059669", "#D97706", "#DC2626",
-    "#7C3AED", "#0891B2", "#65A30D", "#C026D3", "#EA580C",
-]
+PALETTE = ["#7C3AED","#2563EB","#059669","#D97706","#DC2626",
+           "#0891B2","#65A30D","#C026D3","#EA580C","#0F766E"]
 
 st.markdown("""
 <style>
 .avatar {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 30px; height: 30px; border-radius: 50%;
-    color: white; font-size: 11px; font-weight: 700;
-    margin-right: 3px; flex-shrink: 0;
+    display:inline-flex; align-items:center; justify-content:center;
+    width:30px; height:30px; border-radius:50%;
+    color:white; font-size:11px; font-weight:700; margin-right:3px;
 }
-.avatar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-top: 4px; }
-.task-label { font-weight: 600; font-size: 15px; }
-.task-sub { color: #888; font-size: 12px; margin-bottom: 2px; }
-.section-header {
-    font-size: 13px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .06em; color: #888; margin: 18px 0 6px 0;
+.avatar-row { display:flex; flex-wrap:wrap; align-items:center; gap:2px; margin-top:2px; }
+.task-name  { font-weight:600; font-size:15px; line-height:1.3; }
+.task-sub   { color:#888; font-size:12px; }
+.group-hdr  {
+    font-size:12px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.07em; color:#888; margin:20px 0 4px 0;
 }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ============================================================
-# LOADER
-# ============================================================
+# ── LOADER ────────────────────────────────────────────────────
 @st.cache_data
 def load_data(file_bytes: bytes):
     xls = pd.ExcelFile(BytesIO(file_bytes))
@@ -55,52 +48,39 @@ def load_data(file_bytes: bytes):
         raise ValueError(f"Fogli mancanti: {missing}")
 
     df_lav = pd.read_excel(xls, sheet_name="lavorazioni")
-    req_l = {"tipologia_id", "categoria", "sottocategoria", "nome_lavorazione",
-             "variante", "asset_per_giorno", "skill_richiesta"}
-    missing_l = req_l - set(df_lav.columns)
-    if missing_l:
-        raise ValueError(f"Colonne mancanti in 'lavorazioni': {missing_l}")
-    df_lav["asset_per_giorno"] = pd.to_numeric(df_lav["asset_per_giorno"], errors="coerce")
-    df_lav = df_lav.dropna(subset=["asset_per_giorno"]).reset_index(drop=True)
-    df_lav["variante"] = df_lav["variante"].fillna("")
+    req = {"tipologia_id", "sottocategoria", "nome_lavorazione", "minuti_per_unita", "skill_richiesta"}
+    miss = req - set(df_lav.columns)
+    if miss:
+        raise ValueError(f"Colonne mancanti in 'lavorazioni': {miss}")
+    df_lav["minuti_per_unita"] = pd.to_numeric(df_lav["minuti_per_unita"], errors="coerce")
+    df_lav = df_lav.dropna(subset=["minuti_per_unita"]).reset_index(drop=True)
 
     df_team = pd.read_excel(xls, sheet_name="team")
-    req_t = {"id", "nome", "seniority", "costo_orario", "skill_tags", "disponibilita_h_settimana"}
-    missing_t = req_t - set(df_team.columns)
-    if missing_t:
-        raise ValueError(f"Colonne mancanti in 'team': {missing_t}")
+    req_t = {"id","nome","seniority","costo_orario","skill_tags","disponibilita_h_settimana"}
+    miss_t = req_t - set(df_team.columns)
+    if miss_t:
+        raise ValueError(f"Colonne mancanti in 'team': {miss_t}")
     df_team["costo_orario"] = pd.to_numeric(df_team["costo_orario"], errors="coerce")
     df_team["disponibilita_h_settimana"] = pd.to_numeric(df_team["disponibilita_h_settimana"], errors="coerce")
-    df_team["skill_list"] = df_team["skill_tags"].fillna("").apply(
-        lambda s: [t.strip().lower() for t in str(s).split(",") if t.strip()]
-    )
     df_team = df_team.dropna(subset=["costo_orario"]).reset_index(drop=True)
     return df_lav, df_team
 
 
-# ============================================================
-# HELPERS
-# ============================================================
+# ── HELPERS ───────────────────────────────────────────────────
 def initials(name: str) -> str:
     parts = name.split()
-    if len(parts) >= 2:
-        return (parts[0][0] + parts[-1][0]).upper()
-    return name[:2].upper()
-
+    return (parts[0][0] + parts[-1][0]).upper() if len(parts) >= 2 else name[:2].upper()
 
 def avatar_html(name: str, color: str) -> str:
     return f'<span class="avatar" style="background:{color}">{initials(name)}</span>'
 
-
 def avatars_html(names, color_map) -> str:
     if not names:
-        return '<span style="color:#aaa;font-size:13px;">nessuno assegnato</span>'
+        return '<span style="color:#bbb;font-size:13px;">—</span>'
     return '<div class="avatar-row">' + "".join(avatar_html(n, color_map[n]) for n in names) + "</div>"
 
 
-# ============================================================
-# SIDEBAR — file + overhead
-# ============================================================
+# ── SIDEBAR ───────────────────────────────────────────────────
 with st.sidebar:
     st.title("⏱️ AI Team\nEstimator")
     st.divider()
@@ -114,8 +94,7 @@ with st.sidebar:
             if up:
                 file_bytes = up.getvalue()
     else:
-        st.warning("File non trovato — carica manualmente")
-        up = st.file_uploader("ai_team_data.xlsx", type=["xlsx"])
+        up = st.file_uploader("Carica ai_team_data.xlsx", type=["xlsx"])
         file_bytes = up.getvalue() if up else None
 
     if not file_bytes:
@@ -129,154 +108,170 @@ with st.sidebar:
         st.stop()
 
     st.divider()
-    overhead = st.slider("Overhead ×", 1.0, 2.0, OVERHEAD_DEFAULT, 0.05,
-                         help="1.3 = +30% per riunioni e rework")
+    overhead = st.slider(
+        "Overhead ×", 1.0, 2.0, OVERHEAD_DEFAULT, 0.05,
+        help="Moltiplicatore per riunioni, rework, buffer. 1.3 = +30%."
+    )
 
-    # Legenda persone nella sidebar
     st.divider()
     st.markdown("**Team**")
     color_map = {row["nome"]: PALETTE[i % len(PALETTE)] for i, row in df_team.iterrows()}
     has_ruolo = "ruolo" in df_team.columns
     for _, row in df_team.iterrows():
-        col_av, col_info = st.columns([1, 4])
-        with col_av:
-            st.markdown(avatar_html(row["nome"], color_map[row["nome"]]), unsafe_allow_html=True)
-        with col_info:
-            ruolo = row["ruolo"] if has_ruolo else row["seniority"]
-            st.caption(f"**{row['nome'].split()[0]}**  \n{ruolo}")
+        c1, c2 = st.columns([1, 5])
+        c1.markdown(avatar_html(row["nome"], color_map[row["nome"]]), unsafe_allow_html=True)
+        c2.caption(f"**{row['nome'].split()[0]}**  \n{row['ruolo'] if has_ruolo else row['seniority']}")
 
 
-# ============================================================
-# MAIN — una riga per lavorazione
-# ============================================================
-st.header("Stima job")
-st.caption("Per ogni lavorazione: inserisci la **quantità** e assegna le **persone** che ci lavorano.")
+# ── MAIN ──────────────────────────────────────────────────────
+st.header("Costruisci il job")
+st.caption(
+    "Per ogni lavorazione: imposta i **minuti a unità** (modifica il default se per questo progetto "
+    "ci vuole più o meno tempo), la **quantità** di asset e le **persone** assegnate."
+)
 
 tutti_nomi = df_team["nome"].tolist()
 job_items = []
 
-# Raggruppa per sottocategoria
+# Intestazioni colonne
+hcols = st.columns([3, 1.2, 1, 3, 1.8])
+for col, label in zip(hcols, ["Lavorazione", "Min/unità", "Quantità", "Assegnato a", ""]):
+    col.markdown(f"<span style='font-size:12px;font-weight:700;color:#888'>{label}</span>",
+                 unsafe_allow_html=True)
+st.markdown("<hr style='margin:4px 0 8px 0'>", unsafe_allow_html=True)
+
 gruppi = df_lav.groupby("sottocategoria", sort=False)
 
 for gruppo_nome, gruppo_df in gruppi:
-    st.markdown(f'<div class="section-header">{gruppo_nome}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="group-hdr">{gruppo_nome}</div>', unsafe_allow_html=True)
 
-    for i, lav_row in gruppo_df.iterrows():
-        label = lav_row["nome_lavorazione"]
-        if lav_row["variante"]:
-            label += f"  —  {lav_row['variante']}"
+    for i, lav in gruppo_df.iterrows():
+        c_name, c_min, c_qty, c_team, c_av = st.columns([3, 1.2, 1, 3, 1.8])
 
-        col_name, col_qty, col_team, col_av = st.columns([3, 1, 3, 2])
+        with c_name:
+            st.markdown(f'<div class="task-name">{lav["nome_lavorazione"]}</div>', unsafe_allow_html=True)
 
-        with col_name:
-            st.markdown(f'<div class="task-label">{label}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="task-sub">{lav_row["asset_per_giorno"]:.0f} asset/giorno</div>',
-                        unsafe_allow_html=True)
+        with c_min:
+            min_pu = st.number_input(
+                "min", min_value=1, step=1,
+                value=int(lav["minuti_per_unita"]),
+                key=f"min_{i}", label_visibility="collapsed",
+                help=f"Default dal tariffario: {int(lav['minuti_per_unita'])} min. Modificalo per questo progetto."
+            )
 
-        with col_qty:
+        with c_qty:
             qty = st.number_input(
-                "Qta", min_value=0, step=1, value=0,
+                "qta", min_value=0, step=1, value=0,
                 key=f"qty_{i}", label_visibility="collapsed"
             )
 
-        with col_team:
+        with c_team:
             assigned = st.multiselect(
-                "Assegna a",
-                options=tutti_nomi,
+                "persone", options=tutti_nomi,
                 format_func=lambda n: f"{initials(n)}  {n}",
-                key=f"team_{i}",
-                label_visibility="collapsed",
+                key=f"team_{i}", label_visibility="collapsed",
                 placeholder="Assegna persone…",
             )
 
-        with col_av:
+        with c_av:
             st.markdown(avatars_html(assigned, color_map), unsafe_allow_html=True)
 
         if qty > 0 and assigned:
             job_items.append({
-                "nome":             lav_row["nome_lavorazione"],
-                "variante":         lav_row["variante"],
-                "asset_per_giorno": float(lav_row["asset_per_giorno"]),
-                "skill":            lav_row["skill_richiesta"],
-                "quantita":         int(qty),
-                "assigned":         assigned,
+                "nome":            lav["nome_lavorazione"],
+                "minuti_per_unita": float(min_pu),
+                "skill":           lav["skill_richiesta"],
+                "quantita":        int(qty),
+                "assigned":        assigned,
             })
 
-    st.divider()
 
+# ── RISULTATI ─────────────────────────────────────────────────
+st.divider()
+st.header("Risultati")
 
-# ============================================================
-# RISULTATI
-# ============================================================
 if not job_items:
     st.info("Inserisci almeno una quantità e assegna una persona per vedere la stima.")
     st.stop()
 
-# Calcolo con assegnazione per task
-ore_totali = 0.0
+# Calcolo
+ore_base_tot = 0.0
+ore_tot_tot  = 0.0
+ore_pp: dict[str, float]   = {}
+costo_pp: dict[str, float] = {}
 costo_totale = 0.0
-md_base_totale = 0.0
-ore_per_persona: dict[str, float] = {}
-costo_per_persona: dict[str, float] = {}
 
 for it in job_items:
-    md = it["quantita"] / it["asset_per_giorno"]
-    ore = md * ORE_GIORNATA * overhead
-    n = len(it["assigned"])
-    ore_pp = ore / n
-    md_base_totale += md
-    ore_totali += ore
+    minuti_task = it["quantita"] * it["minuti_per_unita"]
+    ore_base    = minuti_task / 60
+    ore_con_oh  = ore_base * overhead
+    n           = len(it["assigned"])
+    ore_pp_task = ore_con_oh / n
+    ore_base_tot += ore_base
+    ore_tot_tot  += ore_con_oh
     for nome in it["assigned"]:
-        tariffa = df_team.loc[df_team["nome"] == nome, "costo_orario"].iloc[0]
-        ore_per_persona[nome] = ore_per_persona.get(nome, 0) + ore_pp
-        costo_per_persona[nome] = costo_per_persona.get(nome, 0) + ore_pp * tariffa
-        costo_totale += ore_pp * tariffa
+        tariffa = float(df_team.loc[df_team["nome"] == nome, "costo_orario"].iloc[0])
+        ore_pp[nome]   = ore_pp.get(nome, 0)   + ore_pp_task
+        costo_pp[nome] = costo_pp.get(nome, 0) + ore_pp_task * tariffa
+        costo_totale  += ore_pp_task * tariffa
 
-# Durata: ore totali / capacità team assegnato
+giorni_totali = ore_tot_tot / ORE_GIORNATA
+
+# Durata calendar: capacità team coinvolto (giorni lavorativi)
 nomi_coinvolti = {n for it in job_items for n in it["assigned"]}
-cap_sett = df_team[df_team["nome"].isin(nomi_coinvolti)]["disponibilita_h_settimana"].sum()
-settimane = ore_totali / cap_sett if cap_sett > 0 else None
+cap_h_sett     = df_team[df_team["nome"].isin(nomi_coinvolti)]["disponibilita_h_settimana"].sum()
+giorni_cal     = (ore_tot_tot / cap_h_sett * 5) if cap_h_sett > 0 else None  # giorni lun-ven
 
-st.subheader("Risultati")
+# Metriche
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Ore totali", f"{ore_totali:.1f} h",
-          help=f"Ore base (senza overhead): {md_base_totale * ORE_GIORNATA:.1f} h")
-m2.metric("Giornate (MD)", f"{ore_totali / ORE_GIORNATA:.1f}")
+m1.metric(
+    "Ore totali",
+    f"{ore_tot_tot:.1f} h",
+    help=f"Senza overhead: {ore_base_tot:.1f} h"
+)
+m2.metric(
+    "Giorni di lavoro",
+    f"{giorni_totali:.1f}",
+    help=f"Giorni da {ORE_GIORNATA:.0f}h. Senza overhead: {ore_base_tot/ORE_GIORNATA:.1f}"
+)
 m3.metric("Costo stimato", f"€ {costo_totale:,.0f}")
-if settimane:
-    m4.metric("Durata", f"{settimane:.1f} settimane")
-
-st.caption(f"Overhead ×{overhead}  ·  1 giornata = {ORE_GIORNATA} h")
-
-with st.expander("Dettaglio per persona"):
-    rows_p = []
-    for nome in sorted(ore_per_persona):
-        tariffa = df_team.loc[df_team["nome"] == nome, "costo_orario"].iloc[0]
-        ruolo = df_team.loc[df_team["nome"] == nome, "ruolo"].iloc[0] if has_ruolo else ""
-        rows_p.append({
-            "": avatar_html(nome, color_map[nome]),
-            "Nome": nome,
-            "Ruolo": ruolo,
-            "Ore": round(ore_per_persona[nome], 1),
-            "Costo": f"€ {costo_per_persona[nome]:,.0f}",
-        })
-    df_p = pd.DataFrame(rows_p)
-    st.dataframe(
-        df_p[["Nome", "Ruolo", "Ore", "Costo"]],
-        hide_index=True, use_container_width=True
+if giorni_cal:
+    m4.metric(
+        "Durata calendario",
+        f"{giorni_cal:.0f} giorni lav.",
+        help="Giorni lun-ven considerando la disponibilità del team selezionato"
     )
 
+st.caption(f"Overhead ×{overhead}  ·  1 giornata = {ORE_GIORNATA:.0f} h lavorative")
+
+# Breakdown per persona
+with st.expander("Dettaglio per persona"):
+    rows_p = []
+    for nome in sorted(ore_pp):
+        tariffa = float(df_team.loc[df_team["nome"] == nome, "costo_orario"].iloc[0])
+        ruolo   = df_team.loc[df_team["nome"] == nome, "ruolo"].iloc[0] if has_ruolo else ""
+        rows_p.append({
+            "Nome":    nome,
+            "Ruolo":   ruolo,
+            "Ore":     round(ore_pp[nome], 1),
+            "Giorni":  round(ore_pp[nome] / ORE_GIORNATA, 1),
+            "Costo":   f"€ {costo_pp[nome]:,.0f}",
+        })
+    st.dataframe(pd.DataFrame(rows_p), hide_index=True, use_container_width=True)
+
+# Breakdown per lavorazione
 with st.expander("Dettaglio per lavorazione"):
     rows_l = []
     for it in job_items:
-        md = it["quantita"] / it["asset_per_giorno"]
-        label = f"{it['nome']}  —  {it['variante']}" if it["variante"] else it["nome"]
+        ore_b = it["quantita"] * it["minuti_per_unita"] / 60
+        ore_c = ore_b * overhead
         rows_l.append({
-            "Lavorazione": label,
-            "Qta": it["quantita"],
-            "Asset/gg": it["asset_per_giorno"],
-            "MD": round(md, 2),
-            "Ore (con overhead)": round(md * ORE_GIORNATA * overhead, 1),
-            "Assegnato a": ", ".join(it["assigned"]),
+            "Lavorazione":    it["nome"],
+            "Qta":            it["quantita"],
+            "Min/unità":      it["minuti_per_unita"],
+            "Ore (base)":     round(ore_b, 1),
+            "Ore (overhead)": round(ore_c, 1),
+            "Giorni":         round(ore_c / ORE_GIORNATA, 1),
+            "Assegnato a":    ", ".join(it["assigned"]),
         })
     st.dataframe(pd.DataFrame(rows_l), hide_index=True, use_container_width=True)
