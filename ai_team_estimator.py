@@ -126,8 +126,9 @@ with st.sidebar:
 # ── MAIN ──────────────────────────────────────────────────────
 st.header("Costruisci il job")
 st.caption(
-    "Per ogni lavorazione: imposta i **minuti a unità** (modifica il default se per questo progetto "
-    "ci vuole più o meno tempo), la **quantità** di asset e le **persone** assegnate."
+    "Per ogni lavorazione: imposta **quante unità riesci a fare in 1 ora** "
+    "(cambia il default se per questo progetto sei più veloce o più lento), "
+    "la **quantità** totale di asset e le **persone** assegnate."
 )
 
 tutti_nomi = df_team["nome"].tolist()
@@ -135,7 +136,7 @@ job_items = []
 
 # Intestazioni colonne
 hcols = st.columns([3, 1.2, 1, 3, 1.8])
-for col, label in zip(hcols, ["Lavorazione", "Min/unità", "Quantità", "Assegnato a", ""]):
+for col, label in zip(hcols, ["Lavorazione", "Unità/ora", "Quantità", "Assegnato a", ""]):
     col.markdown(f"<span style='font-size:12px;font-weight:700;color:#888'>{label}</span>",
                  unsafe_allow_html=True)
 st.markdown("<hr style='margin:4px 0 8px 0'>", unsafe_allow_html=True)
@@ -152,11 +153,13 @@ for gruppo_nome, gruppo_df in gruppi:
             st.markdown(f'<div class="task-name">{lav["nome_lavorazione"]}</div>', unsafe_allow_html=True)
 
         with c_min:
-            min_pu = st.number_input(
-                "min", min_value=1, step=1,
-                value=int(lav["minuti_per_unita"]),
+            # Converti minuti_per_unita → unità/ora per il display
+            default_uph = round(60 / lav["minuti_per_unita"], 1)
+            uph = st.number_input(
+                "uph", min_value=0.1, step=0.5,
+                value=float(default_uph),
                 key=f"min_{i}", label_visibility="collapsed",
-                help=f"Default dal tariffario: {int(lav['minuti_per_unita'])} min. Modificalo per questo progetto."
+                help=f"Default dal tariffario: {default_uph} unità/ora. Cambialo se per questo progetto vai più veloce o lento."
             )
 
         with c_qty:
@@ -178,11 +181,11 @@ for gruppo_nome, gruppo_df in gruppi:
 
         if qty > 0 and assigned:
             job_items.append({
-                "nome":            lav["nome_lavorazione"],
-                "minuti_per_unita": float(min_pu),
-                "skill":           lav["skill_richiesta"],
-                "quantita":        int(qty),
-                "assigned":        assigned,
+                "nome":     lav["nome_lavorazione"],
+                "uph":      float(uph),   # unità per ora
+                "skill":    lav["skill_richiesta"],
+                "quantita": int(qty),
+                "assigned": assigned,
             })
 
 
@@ -202,8 +205,7 @@ costo_pp: dict[str, float] = {}
 costo_totale = 0.0
 
 for it in job_items:
-    minuti_task = it["quantita"] * it["minuti_per_unita"]
-    ore_base    = minuti_task / 60
+    ore_base    = it["quantita"] / it["uph"]   # quantità ÷ unità/ora
     ore_con_oh  = ore_base * overhead
     n           = len(it["assigned"])
     ore_pp_task = ore_con_oh / n
@@ -263,12 +265,12 @@ with st.expander("Dettaglio per persona"):
 with st.expander("Dettaglio per lavorazione"):
     rows_l = []
     for it in job_items:
-        ore_b = it["quantita"] * it["minuti_per_unita"] / 60
+        ore_b = it["quantita"] / it["uph"]
         ore_c = ore_b * overhead
         rows_l.append({
             "Lavorazione":    it["nome"],
             "Qta":            it["quantita"],
-            "Min/unità":      it["minuti_per_unita"],
+            "Unità/ora":      it["uph"],
             "Ore (base)":     round(ore_b, 1),
             "Ore (overhead)": round(ore_c, 1),
             "Giorni":         round(ore_c / ORE_GIORNATA, 1),
