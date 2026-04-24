@@ -198,26 +198,31 @@ if not job_items:
     st.stop()
 
 # Calcolo
-ore_base_tot = 0.0
-ore_tot_tot  = 0.0
+ore_base_tot  = 0.0
+ore_effort_tot = 0.0   # effort totale (somma ore × persone, usato per costo)
+ore_reali_tot  = 0.0   # tempo reale (ore ÷ n persone in parallelo per ogni task)
 ore_pp: dict[str, float]   = {}
 costo_pp: dict[str, float] = {}
 costo_totale = 0.0
 
 for it in job_items:
-    ore_base    = it["quantita"] / it["uph"]   # quantità ÷ unità/ora
-    ore_con_oh  = ore_base * overhead
-    n           = len(it["assigned"])
-    ore_pp_task = ore_con_oh / n
-    ore_base_tot += ore_base
-    ore_tot_tot  += ore_con_oh
+    ore_base   = it["quantita"] / it["uph"]
+    ore_con_oh = ore_base * overhead
+    n          = len(it["assigned"])
+    ore_reali  = ore_con_oh / n              # con n persone in parallelo
+
+    ore_base_tot   += ore_base
+    ore_effort_tot += ore_con_oh
+    ore_reali_tot  += ore_reali
+
     for nome in it["assigned"]:
         tariffa = float(df_team.loc[df_team["nome"] == nome, "costo_orario"].iloc[0])
-        ore_pp[nome]   = ore_pp.get(nome, 0)   + ore_pp_task
-        costo_pp[nome] = costo_pp.get(nome, 0) + ore_pp_task * tariffa
-        costo_totale  += ore_pp_task * tariffa
+        ore_pp[nome]   = ore_pp.get(nome, 0)   + ore_reali
+        costo_pp[nome] = costo_pp.get(nome, 0) + ore_reali * tariffa
+        costo_totale  += ore_reali * tariffa
 
-giorni_totali = ore_tot_tot / ORE_GIORNATA
+giorni_reali  = ore_reali_tot  / ORE_GIORNATA
+giorni_effort = ore_effort_tot / ORE_GIORNATA
 
 # Durata calendar: capacità team coinvolto (giorni lavorativi)
 nomi_coinvolti = {n for it in job_items for n in it["assigned"]}
@@ -227,16 +232,20 @@ giorni_cal     = (ore_tot_tot / cap_h_sett * 5) if cap_h_sett > 0 else None  # g
 # Metriche
 m1, m2, m3, m4 = st.columns(4)
 m1.metric(
-    "Ore totali",
-    f"{ore_tot_tot:.1f} h",
-    help=f"Senza overhead: {ore_base_tot:.1f} h"
+    "Tempo reale",
+    f"{ore_reali_tot:.1f} h",
+    help=f"Ore effettive considerando le persone che lavorano in parallelo. Senza overhead: {ore_base_tot:.1f} h"
 )
 m2.metric(
-    "Giorni di lavoro",
-    f"{giorni_totali:.1f}",
-    help=f"Giorni da {ORE_GIORNATA:.0f}h. Senza overhead: {ore_base_tot/ORE_GIORNATA:.1f}"
+    "Giorni reali",
+    f"{giorni_reali:.1f}",
+    help=f"Giorni lavorativi effettivi (tempo reale ÷ {ORE_GIORNATA:.0f}h)"
 )
-m3.metric("Costo stimato", f"€ {costo_totale:,.0f}")
+m3.metric(
+    "Costo stimato",
+    f"€ {costo_totale:,.0f}",
+    help=f"Basato sul tempo reale × tariffa oraria di ogni persona"
+)
 if giorni_cal:
     m4.metric(
         "Durata calendario",
@@ -244,7 +253,10 @@ if giorni_cal:
         help="Giorni lun-ven considerando la disponibilità del team selezionato"
     )
 
-st.caption(f"Overhead ×{overhead}  ·  1 giornata = {ORE_GIORNATA:.0f} h lavorative")
+st.caption(
+    f"Overhead ×{overhead}  ·  1 giornata = {ORE_GIORNATA:.0f} h  ·  "
+    f"Effort totale: {ore_effort_tot:.1f} h ({giorni_effort:.1f} giorni)"
+)
 
 # Breakdown per persona
 with st.expander("Dettaglio per persona"):
