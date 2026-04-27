@@ -361,15 +361,12 @@ with tab_job:
     with top_l:
         nome_progetto = st.text_input("Nome progetto", placeholder="Es. Nike FW25 — Video Campaign",
                                       label_visibility="collapsed")
-        if nome_progetto:
-            st.caption(f"**{nome_progetto}**")
-
     with top_r:
-        pc = st.columns([3,1,1])
+        pc = st.columns([4,1,0.7])
         preset_sel  = pc[0].selectbox("Preset", ["— nessuno —"] + list(presets.keys()),
                                        label_visibility="collapsed")
         load_clicked = pc[1].button("Carica", use_container_width=True)
-        del_clicked  = pc[2].button("Elimina", use_container_width=True)
+        del_clicked  = pc[2].button("X", use_container_width=True, help="Elimina preset selezionato")
 
     if "preset_data" not in st.session_state:
         st.session_state.preset_data = {}
