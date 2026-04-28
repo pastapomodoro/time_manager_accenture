@@ -932,11 +932,11 @@ def build_results_html(
         "rate": float(s.get("costo_orario",0)),
     } for s in subco_list])
 
-    # Phase map
+    # Phase map — use task name for granularity (not just subcategory)
     phase_map: dict[str,float] = {}
     task_rows_js = []
     for it in job_items:
-        fase = str(it.get("fase","")).strip() or "OTHER"
+        fase = str(it.get("nome","")).strip() or str(it.get("fase","")).strip() or "OTHER"
         base_h = it["quantita"] / it["uph"]
         prod_c = it.get("prod_cost",0.0)
         phase_map[fase] = phase_map.get(fase,0) + base_h
