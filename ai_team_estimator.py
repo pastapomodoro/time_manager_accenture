@@ -32,7 +32,7 @@ if _USE_SUPABASE:
         <style>
         header[data-testid="stHeader"], #MainMenu, footer { display:none }
         [data-testid="stAppViewContainer"] { background: oklch(0.9892 0.0054 117.9205) }
-        .block-container { max-width: 360px !important; padding-top: 6rem !important; }
+        .block-container { max-width: 480px !important; padding-top: 6rem !important; }
         div[data-testid="stForm"] {
           background: #fff;
           border: 1px solid oklch(0.9288 0.0126 255.5078);
