@@ -1087,7 +1087,7 @@ tbody tr:hover{{background:var(--bg);}}
       <button class="toggle-btn" id="btn-ucr" onclick="setMode(false)">BD / Internal (UCR)</button>
     </div>
     <span class="badge badge-dates">{start_s} → {dead_s}</span>
-    <button class="pdf-btn" onclick="window.print()">⬇ PDF</button>
+    <button class="pdf-btn" onclick="printWithCharts()">⬇ PDF</button>
   </div>
 </div>
 
@@ -1338,24 +1338,30 @@ function recomputeMarkup(){{
   document.getElementById('grand-total-val').textContent = feur(base + extra);
 }}
 
-// ── Print: freeze canvases as images ──
-window.addEventListener('beforeprint', ()=>{{
-  document.querySelectorAll('canvas').forEach(c=>{{
+// ── Print with charts frozen as images ──
+function printWithCharts(){{
+  const canvases = document.querySelectorAll('canvas');
+  const snapshots = [];
+  canvases.forEach(c=>{{
     const img = document.createElement('img');
     img.src = c.toDataURL('image/png');
-    img.style.width  = c.offsetWidth  + 'px';
-    img.style.height = c.offsetHeight + 'px';
-    img.dataset.printProxy = '1';
+    img.style.cssText = `width:${{c.offsetWidth}}px;height:${{c.offsetHeight}}px;display:block;`;
     c.parentNode.insertBefore(img, c);
     c.style.display = 'none';
+    snapshots.push({{canvas:c, img}});
   }});
-}});
-window.addEventListener('afterprint', ()=>{{
-  document.querySelectorAll('img[data-print-proxy]').forEach(i=>{{
-    i.previousSibling && (i.previousSibling.style.display = '');
-    i.remove();
-  }});
-}});
+  // Small delay so browser paints images before print dialog
+  setTimeout(()=>{{
+    window.print();
+    // Restore after print (works for both Cancel and Print)
+    setTimeout(()=>{{
+      snapshots.forEach(s=>{{
+        s.canvas.style.display = '';
+        s.img.remove();
+      }});
+    }}, 1000);
+  }}, 120);
+}}
 
 // ── Init ──
 setMode({init_lcr_js});
