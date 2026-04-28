@@ -60,12 +60,10 @@ def root() -> str:
   il runtime serverless non esegue <code>streamlit run</code>.</p>
   <p><strong>Esegui in locale:</strong></p>
   <pre><code>pip install -r requirements.txt
-streamlit run ai_team_estimator.py
-# oppure
-streamlit run cm1_estimator.py</code></pre>
+streamlit run ai_team_estimator.py</code></pre>
   <p><strong>Deploy Streamlit consigliato:</strong> collega il repo a
   <a href="https://share.streamlit.io/">Streamlit Community Cloud</a>
-  e imposta il file principale (<code>ai_team_estimator.py</code> o <code>cm1_estimator.py</code>).</p>
+  e imposta il file principale (<code>ai_team_estimator.py</code>).</p>
   <p><a href="{REPO}">Repository su GitHub</a></p>
 </body>
 </html>

@@ -15,7 +15,8 @@ try:
                     load_profiles_db, save_profiles_db,
                     load_presets_db, save_preset_db, delete_preset_db,
                     load_xlsx_from_storage, upload_xlsx_to_storage,
-                    save_session_tokens, clear_saved_session, restore_saved_session)
+                    save_session_tokens, clear_saved_session, restore_saved_session,
+                    load_subcontractors_db, save_subcontractors_db)
     _HAS_SUPABASE = True
 except ImportError:
     _HAS_SUPABASE = False
@@ -184,7 +185,7 @@ if _USE_SUPABASE:
 
         <div class="login-hero">
           <h1>AI Team<br>Estimator</h1>
-          <p>Stima tempi, costi e risorse del tuo team AI</p>
+          <p>Estimate time, costs and resources for your AI team</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -193,11 +194,11 @@ if _USE_SUPABASE:
 
         if st.session_state.auth_mode == "login":
             with st.form("login_form"):
-                st.markdown("**Accedi al tuo account**")
-                email = st.text_input("Email", placeholder="nome@accenture.com", label_visibility="collapsed")
+                st.markdown("**Sign in to your account**")
+                email = st.text_input("Email", placeholder="name@accenture.com", label_visibility="collapsed")
                 pwd   = st.text_input("Password", type="password", placeholder="Password", label_visibility="collapsed")
                 remember_me = st.checkbox("Remember me", value=st.session_state.remember_me)
-                if st.form_submit_button("Accedi", use_container_width=True):
+                if st.form_submit_button("Sign in", use_container_width=True):
                     try:
                         res = sign_in(email, pwd)
                         st.session_state.sb_session = res.session
@@ -208,23 +209,23 @@ if _USE_SUPABASE:
                             clear_saved_session()
                         st.rerun()
                     except Exception:
-                        st.error("Credenziali non valide")
-            if st.button("Non hai un account? Registrati →", use_container_width=True):
+                        st.error("Invalid credentials")
+            if st.button("No account? Register →", use_container_width=True):
                 st.session_state.auth_mode = "signup"
                 st.rerun()
         else:
             with st.form("signup_form"):
-                st.markdown("**Crea il tuo account**")
-                new_email = st.text_input("Email", placeholder="nome@accenture.com", label_visibility="collapsed")
+                st.markdown("**Create your account**")
+                new_email = st.text_input("Email", placeholder="name@accenture.com", label_visibility="collapsed")
                 new_pwd   = st.text_input("Password", type="password", placeholder="Password", label_visibility="collapsed")
-                new_pwd2  = st.text_input("Conferma password", type="password", placeholder="Conferma password", label_visibility="collapsed")
-                if st.form_submit_button("Crea account", use_container_width=True):
+                new_pwd2  = st.text_input("Confirm password", type="password", placeholder="Confirm password", label_visibility="collapsed")
+                if st.form_submit_button("Create account", use_container_width=True):
                     if not new_email or not new_pwd:
-                        st.error("Compila tutti i campi")
+                        st.error("Please fill in all fields")
                     elif not new_email.lower().endswith("@accenture.com"):
-                        st.error("La registrazione è riservata agli account @accenture.com")
+                        st.error("Registration is restricted to @accenture.com accounts")
                     elif new_pwd != new_pwd2:
-                        st.error("Le password non coincidono")
+                        st.error("Passwords do not match")
                     else:
                         try:
                             res = sign_up(new_email, new_pwd)
@@ -232,33 +233,36 @@ if _USE_SUPABASE:
                                 st.session_state.sb_session = res.session
                                 st.rerun()
                             else:
-                                st.success("Controlla la email per confermare, poi accedi.")
+                                st.success("Check your email to confirm, then sign in.")
                         except Exception as e:
-                            st.error(f"Errore: {e}")
-            if st.button("← Hai già un account? Accedi", use_container_width=True):
+                            st.error(f"Error: {e}")
+            if st.button("← Already have an account? Sign in", use_container_width=True):
                 st.session_state.auth_mode = "login"
                 st.rerun()
         st.stop()
 
 ORE_GIORNATA     = 8.0
-# Percorso Excel: stessa cartella dello script, oppure file ovunque con env AI_TEAM_DATA_XLSX
+RETRY_MULTIPLIER = 3
+SUBCO_COLOR      = "#EC4899"
+
 _XLSX_ENV = os.environ.get("AI_TEAM_DATA_XLSX", "").strip()
 DEFAULT_XLSX = (
     os.path.abspath(os.path.expanduser(os.path.normpath(_XLSX_ENV)))
     if _XLSX_ENV
     else os.path.join(os.path.dirname(__file__), "ai_team_data.xlsx")
 )
-PRESETS_FILE     = os.path.join(os.path.dirname(__file__), "presets.json")
-PROFILES_FILE    = os.path.join(os.path.dirname(__file__), "profiles.json")
+PRESETS_FILE  = os.path.join(os.path.dirname(__file__), "presets.json")
+PROFILES_FILE = os.path.join(os.path.dirname(__file__), "profiles.json")
+SUBCO_FILE    = os.path.join(os.path.dirname(__file__), "subcontractors.json")
 
 PALETTE = ["#7C3AED","#2563EB","#059669","#D97706","#DC2626",
            "#0891B2","#65A30D","#C026D3","#EA580C","#0F766E"]
 
-RUOLI_OPTIONS    = ["Senior Graphic Designer","Junior Graphic Designer",
-                    "Video Editor","Art Director","Motion Designer","Retoucher","Altro"]
+RUOLI_OPTIONS     = ["Senior Graphic Designer","Intern",
+                     "Video Editor","Art Director","Motion Designer","Retoucher","Altro"]
 SENIORITY_OPTIONS = ["junior","mid","senior","lead"]
-SKILL_OPTIONS    = ["retouch","compositing","lighting","prompt","video","editing",
-                    "color","motion","3d","art direction"]
+SKILL_OPTIONS     = ["retouch","compositing","lighting","prompt","video","editing",
+                     "color","motion","3d","art direction"]
 
 st.markdown("""
 <style>
@@ -586,6 +590,34 @@ hr { border-color: var(--border) !important; }
   line-height: 1.45;
 }
 .bento-plan-stat strong { color: var(--fg); font-weight: 700; }
+
+/* ── COST BREAKDOWN ──────────────────────────────────────── */
+.cost-breakdown {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 14px 16px;
+  margin-top: 12px;
+}
+.cost-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  font-size: 13px;
+  color: var(--fg);
+}
+.cost-row-label { color: var(--muted-fg); font-size: 12px; }
+.cost-row-tag {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; padding: 2px 7px; border-radius: 999px;
+  background: var(--accent); color: var(--accent-fg); margin-left: 6px;
+}
+.cost-divider { border-top: 1px solid var(--border); margin: 6px 0; }
+.cost-total {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 8px; font-size: 15px; font-weight: 700; color: var(--fg);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -601,6 +633,7 @@ ICO_DL     = _ico('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polylin
 ICO_CHECK  = _ico('<polyline points="20 6 9 17 4 12"/>', color="var(--success)")
 ICO_FILE   = _ico('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>')
 ICO_WRENCH = _ico('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>')
+ICO_SUBCO  = _ico('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/>')
 
 
 # ── HELPERS ───────────────────────────────────────────────────
@@ -615,15 +648,15 @@ def avatar_html(name: str, color: str, size: int = 32) -> str:
 def avatars_html(names, color_map) -> str:
     if not names:
         return '<span style="color:var(--empty);font-size:13px;">—</span>'
-    return '<div class="avatar-row">' + "".join(avatar_html(n, color_map[n]) for n in names) + "</div>"
+    return '<div class="avatar-row">' + "".join(avatar_html(n, color_map.get(n, "#888")) for n in names) + "</div>"
 
 
 def compact_avatars_html(names, color_map, max_visible: int = 5) -> str:
     if not names:
-        return '<span class="job-settings-subtle">Nessuna persona selezionata</span>'
+        return '<span class="job-settings-subtle">No person selected</span>'
     visible = names[:max_visible]
     extra = len(names) - len(visible)
-    avatars = "".join(avatar_html(n, color_map[n], size=28) for n in visible)
+    avatars = "".join(avatar_html(n, color_map.get(n, "#888"), size=28) for n in visible)
     extra_html = f'<span class="avatar-count">+{extra}</span>' if extra > 0 else ""
     return f'<div class="compact-avatar-row">{avatars}{extra_html}</div>'
 
@@ -637,7 +670,7 @@ def fmt_currency(value: float) -> str:
 
 
 def fmt_workdays_ceil(days: float) -> str:
-    return f"{max(1, math.ceil(days))} gg lav."
+    return f"{max(1, math.ceil(days))} work days"
 
 
 def bento_kpi_html(label: str, value: str, sub: str = "") -> str:
@@ -653,7 +686,7 @@ def bento_kpi_html(label: str, value: str, sub: str = "") -> str:
 
 def phase_bars_html(df: pd.DataFrame, max_rows: int = 8) -> str:
     if df.empty:
-        return '<p class="bento-plan-stat" style="margin-bottom:0;color:var(--muted-fg)">Nessun dato fase disponibile.</p>'
+        return '<p class="bento-plan-stat" style="margin-bottom:0;color:var(--muted-fg)">No phase data available.</p>'
 
     clipped = df.head(max_rows)
     max_effort = float(clipped["ore_effort"].max()) if not clipped.empty else 0.0
@@ -662,7 +695,7 @@ def phase_bars_html(df: pd.DataFrame, max_rows: int = 8) -> str:
 
     rows = []
     for idx, row in clipped.reset_index(drop=True).iterrows():
-        phase_name = str(row.get("fase", "ALTRO") or "ALTRO")
+        phase_name = str(row.get("fase", "OTHER") or "OTHER")
         effort = float(row.get("ore_effort", 0.0) or 0.0)
         pct = max(4.0, min(100.0, (effort / max_effort) * 100.0)) if effort > 0 else 0.0
         color = PALETTE[idx % len(PALETTE)]
@@ -706,6 +739,23 @@ def save_profiles(profiles: list[dict]):
         except Exception:
             pass
     json.dump(profiles, open(PROFILES_FILE, "w"), indent=2, ensure_ascii=False)
+
+def load_subcontractors() -> list[dict]:
+    if _USE_SUPABASE:
+        try:
+            return load_subcontractors_db()
+        except Exception:
+            pass
+    return json.load(open(SUBCO_FILE)) if os.path.exists(SUBCO_FILE) else []
+
+def save_subcontractors(subcos: list[dict]):
+    if _USE_SUPABASE:
+        try:
+            save_subcontractors_db(subcos)
+            return
+        except Exception:
+            pass
+    json.dump(subcos, open(SUBCO_FILE, "w"), indent=2, ensure_ascii=False)
 
 
 def clean_float(value, default: float = 0.0) -> float:
@@ -782,6 +832,7 @@ def build_editor_rows(df_lav: pd.DataFrame, preset_rows: list[dict]) -> pd.DataF
             "unita_ora": round(60 / row["minuti_per_unita"], 1),
             "quantita": 0,
             "assegnato_a": "",
+            "costo_per_unita": clean_float(row.get("costo_per_unita_eur", 0)),
         }
         for _, row in df_lav.iterrows()
     ]
@@ -802,6 +853,7 @@ def build_editor_rows(df_lav: pd.DataFrame, preset_rows: list[dict]) -> pd.DataF
             "unita_ora": clean_float(preset_row.get("unita_ora", row.get("unita_ora", 0))),
             "quantita": clean_int(preset_row.get("quantita", row.get("quantita", 0))),
             "assegnato_a": str(preset_row.get("assegnato_a", row.get("assegnato_a", ""))).strip(),
+            "costo_per_unita": clean_float(row.get("costo_per_unita", 0)),
         })
         merged_rows.append(row)
         used_names.add(nome)
@@ -812,7 +864,7 @@ def build_editor_rows(df_lav: pd.DataFrame, preset_rows: list[dict]) -> pd.DataF
 
     return pd.DataFrame(
         merged_rows,
-        columns=["sottocategoria", "nome_lavorazione", "skill_richiesta", "unita_ora", "quantita", "assegnato_a"],
+        columns=["sottocategoria", "nome_lavorazione", "skill_richiesta", "unita_ora", "quantita", "assegnato_a", "costo_per_unita"],
     )
 
 
@@ -821,28 +873,38 @@ def build_editor_rows(df_lav: pd.DataFrame, preset_rows: list[dict]) -> pd.DataF
 def load_lavorazioni(file_bytes: bytes) -> pd.DataFrame:
     xls = pd.ExcelFile(BytesIO(file_bytes))
     if "lavorazioni" not in xls.sheet_names:
-        raise ValueError("Foglio 'lavorazioni' non trovato")
+        raise ValueError("Sheet 'lavorazioni' not found")
     df = pd.read_excel(xls, sheet_name="lavorazioni")
     req = {"tipologia_id","sottocategoria","nome_lavorazione","minuti_per_unita","skill_richiesta"}
     miss = req - set(df.columns)
     if miss:
-        raise ValueError(f"Colonne mancanti in 'lavorazioni': {miss}")
+        raise ValueError(f"Missing columns in 'lavorazioni': {miss}")
     df["minuti_per_unita"] = pd.to_numeric(df["minuti_per_unita"], errors="coerce")
+    if "costo_per_unita_eur" not in df.columns:
+        df["costo_per_unita_eur"] = 0.0
+    else:
+        df["costo_per_unita_eur"] = pd.to_numeric(df["costo_per_unita_eur"], errors="coerce").fillna(0.0)
     return df.dropna(subset=["minuti_per_unita"]).reset_index(drop=True)
 
 @st.cache_data
 def load_team_from_excel(file_bytes: bytes) -> list[dict]:
     xls = pd.ExcelFile(BytesIO(file_bytes))
     if "team" not in xls.sheet_names:
-        raise ValueError("Foglio 'team' non trovato")
+        raise ValueError("Sheet 'team' not found")
     df = pd.read_excel(xls, sheet_name="team")
-    df["costo_orario"] = pd.to_numeric(df["costo_orario"], errors="coerce")
+    # Support legacy costo_orario → promote to costo_lcr
+    if "costo_lcr" not in df.columns:
+        df["costo_lcr"] = pd.to_numeric(df.get("costo_orario", 0), errors="coerce").fillna(0)
+        df["costo_ucr"] = 0.0
+    else:
+        df["costo_lcr"] = pd.to_numeric(df["costo_lcr"], errors="coerce").fillna(0)
+        df["costo_ucr"] = pd.to_numeric(df.get("costo_ucr", 0), errors="coerce").fillna(0)
     df["disponibilita_h_settimana"] = pd.to_numeric(df["disponibilita_h_settimana"], errors="coerce")
-    df = df.dropna(subset=["costo_orario"]).reset_index(drop=True)
+    df = df.dropna(subset=["costo_lcr"]).reset_index(drop=True)
     return df.to_dict("records")
 
 def get_team_df() -> pd.DataFrame:
-    """Priorità: profiles.json > Excel."""
+    """Priority: profiles.json > Excel."""
     profiles = load_profiles()
     if profiles is not None:
         return pd.DataFrame(profiles)
@@ -853,35 +915,56 @@ def get_team_df() -> pd.DataFrame:
 
 
 # ── EXPORT ────────────────────────────────────────────────────
-def build_export_excel(nome_progetto, job_items, ore_pp, costo_pp,
-                       costo_totale, ore_reali_tot, giorni_reali,
-                       df_team) -> bytes:
+def build_export_excel(nome_progetto, job_items, ore_pp, costo_pp_internal, costo_pp_subco,
+                       costo_pp_prod, costo_totale, ore_reali_tot, giorni_reali,
+                       df_team, chargeable: bool) -> bytes:
+    rate_label = "LCR" if chargeable else "UCR (BD)"
     buf = BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
+        internal_cost = sum(costo_pp_internal.values())
+        subco_cost    = sum(costo_pp_subco.values())
+        prod_cost     = sum(costo_pp_prod.values())
         pd.DataFrame([
-            {"Campo":"Progetto",      "Valore": nome_progetto},
-            {"Campo":"Data",          "Valore": datetime.now().strftime("%d/%m/%Y")},
-            {"Campo":"Tempo reale",   "Valore": f"{ore_reali_tot:.1f} h"},
-            {"Campo":"Giorni reali",  "Valore": f"{giorni_reali:.1f}"},
-            {"Campo":"Costo stimato", "Valore": f"€ {costo_totale:,.0f}"},
-        ]).to_excel(w, sheet_name="Riepilogo", index=False)
+            {"Field": "Project",           "Value": nome_progetto},
+            {"Field": "Date",              "Value": datetime.now().strftime("%d/%m/%Y")},
+            {"Field": "Project type",      "Value": "Chargeable (LCR)" if chargeable else "BD / Internal (UCR)"},
+            {"Field": "Elapsed MD",        "Value": f"{ore_reali_tot:.1f} h"},
+            {"Field": "Working days",      "Value": f"{giorni_reali:.1f}"},
+            {"Field": f"Internal team cost [{rate_label}]", "Value": f"€ {internal_cost:,.0f}"},
+            {"Field": "Subcontractor cost [LCR]",           "Value": f"€ {subco_cost:,.0f}"},
+            {"Field": "Production cost (API) [LCR]",        "Value": f"€ {prod_cost:,.0f}"},
+            {"Field": "Total job cost",    "Value": f"€ {costo_totale:,.0f}"},
+        ]).to_excel(w, sheet_name="Summary", index=False)
 
         pd.DataFrame([{
-            "Lavorazione": it["nome"], "Quantità": it["quantita"],
-            "Unità/ora": it["uph"],
-            "Ore base": round(it["quantita"]/it["uph"], 2),
-            "Ore reali": round(it["quantita"]/it["uph"]/len(it["assigned"]), 2),
-            "Giorni reali": round(it["quantita"]/it["uph"]/len(it["assigned"])/ORE_GIORNATA, 2),
-            "Assegnato a": ", ".join(it["assigned"]),
-        } for it in job_items]).to_excel(w, sheet_name="Lavorazioni", index=False)
+            "Task": it["nome"], "Qty": it["quantita"],
+            "Units/hr": it["uph"],
+            "Base hours": round(it["quantita"]/it["uph"], 2),
+            "Real hours": round(it["quantita"]/it["uph"]/max(len(it["assigned"]),1), 2),
+            "Working days": round(it["quantita"]/it["uph"]/max(len(it["assigned"]),1)/ORE_GIORNATA, 2),
+            "Assigned to": ", ".join(it["assigned"]),
+            "Prod cost (API) €": round(it.get("prod_cost", 0), 2),
+        } for it in job_items]).to_excel(w, sheet_name="Tasks", index=False)
 
-        pd.DataFrame([{
-            "Nome": n,
-            "Ruolo": df_team.loc[df_team["nome"]==n,"ruolo"].iloc[0] if "ruolo" in df_team.columns else "",
-            "Ore": round(ore_pp[n],2),
-            "Giorni": round(ore_pp[n]/ORE_GIORNATA,2),
-            "Costo €": round(costo_pp[n],2),
-        } for n in sorted(ore_pp)]).to_excel(w, sheet_name="Team", index=False)
+        all_names = sorted(set(list(ore_pp.keys())))
+        team_rows = []
+        for n in all_names:
+            is_subco = n in costo_pp_subco or (n not in costo_pp_internal and n in ore_pp)
+            ruolo = ""
+            if not is_subco and "ruolo" in df_team.columns:
+                match = df_team.loc[df_team["nome"]==n, "ruolo"]
+                if not match.empty:
+                    ruolo = str(match.iloc[0])
+            team_rows.append({
+                "Name": n,
+                "Type": "Subcontractor" if n in costo_pp_subco and n not in costo_pp_internal else "Internal",
+                "Role": ruolo,
+                "Hours": round(ore_pp.get(n, 0), 2),
+                "Days": round(ore_pp.get(n, 0) / ORE_GIORNATA, 2),
+                "Rate type": "LCR" if (n in costo_pp_subco and n not in costo_pp_internal) else rate_label,
+                "Cost €": round(costo_pp_internal.get(n, 0) + costo_pp_subco.get(n, 0), 2),
+            })
+        pd.DataFrame(team_rows).to_excel(w, sheet_name="Team", index=False)
     return buf.getvalue()
 
 
@@ -895,29 +978,31 @@ def build_template_excel(source_bytes: bytes | None = None) -> bytes:
         pd.DataFrame([
             {
                 "tipologia_id": "CAT-001",
-                "sottocategoria": "GENERAZIONE",
-                "nome_lavorazione": "Generazione immagine AI",
+                "sottocategoria": "GENERATION",
+                "nome_lavorazione": "AI Image Generation",
                 "minuti_per_unita": 60,
                 "skill_richiesta": "prompt",
+                "costo_per_unita_eur": 0.0,
             }
         ]).to_excel(w, sheet_name="lavorazioni", index=False)
 
         pd.DataFrame([
             {
                 "id": 1,
-                "nome": "Nome Cognome",
+                "nome": "Name Surname",
                 "ruolo": "Senior Graphic Designer",
                 "seniority": "senior",
-                "costo_orario": 15,
+                "costo_lcr": 15,
+                "costo_ucr": 10,
                 "skill_tags": "prompt,retouch",
                 "disponibilita_h_settimana": 40,
             }
         ]).to_excel(w, sheet_name="team", index=False)
 
         pd.DataFrame([
-            {"foglio": "lavorazioni", "note": "Compila le lavorazioni del catalogo. `minuti_per_unita` deve essere numerico."},
-            {"foglio": "team", "note": "Compila il team. `costo_orario` e `disponibilita_h_settimana` devono essere numerici."},
-        ]).to_excel(w, sheet_name="_istruzioni", index=False)
+            {"sheet": "lavorazioni", "note": "Fill tasks catalogue. `minuti_per_unita` must be numeric. `costo_per_unita_eur` is the API/production cost per unit (0 if no API cost)."},
+            {"sheet": "team", "note": "Fill team. `costo_lcr` = chargeable rate, `costo_ucr` = BD/internal rate. `disponibilita_h_settimana` must be numeric. Set role to 'Intern' for zero-cost members."},
+        ]).to_excel(w, sheet_name="_instructions", index=False)
     return buf.getvalue()
 
 
@@ -930,25 +1015,25 @@ with st.sidebar:
     if _USE_SUPABASE:
         file_bytes = load_xlsx_from_storage()
         if file_bytes:
-            st.caption("Excel caricato da Supabase Storage")
+            st.caption("Excel loaded from Supabase Storage")
         else:
-            st.warning("Nessun Excel nel bucket Supabase.")
+            st.warning("No Excel file in Supabase bucket.")
             file_bytes = None
     elif os.path.exists(DEFAULT_XLSX):
         with open(DEFAULT_XLSX, "rb") as f:
             file_bytes = f.read()
         if _XLSX_ENV:
-            st.caption(f"Excel caricato da: `{DEFAULT_XLSX}`")
+            st.caption(f"Excel loaded from: `{DEFAULT_XLSX}`")
         else:
-            st.caption("`ai_team_data.xlsx` caricato")
+            st.caption("`ai_team_data.xlsx` loaded")
     else:
         file_bytes = None
 
     b_left, b_right = st.columns([1, 1], gap="small")
     with b_left:
-        with st.popover("Sostituisci file Excel", use_container_width=True):
+        with st.popover("Replace Excel file", use_container_width=True):
             up = st.file_uploader(
-                "Carica nuovo Excel",
+                "Upload new Excel",
                 type=["xlsx"],
                 key="sidebar_replace_excel",
             )
@@ -957,11 +1042,11 @@ with st.sidebar:
                 if _USE_SUPABASE:
                     upload_xlsx_to_storage(uploaded_bytes)
                     st.cache_data.clear()
-                    st.toast("File aggiornato")
+                    st.toast("File updated")
                     st.rerun()
                 else:
                     file_bytes = uploaded_bytes
-                    st.toast("File Excel caricato")
+                    st.toast("Excel file loaded")
 
     with b_right:
         template_excel = build_template_excel(
@@ -970,7 +1055,7 @@ with st.sidebar:
             else (open(DEFAULT_XLSX, "rb").read() if os.path.exists(DEFAULT_XLSX) else None)
         )
         st.download_button(
-            "Template Excel",
+            "Excel Template",
             data=template_excel,
             file_name="ai_team_template.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -979,10 +1064,10 @@ with st.sidebar:
 
     if not _USE_SUPABASE and uploaded_bytes:
         file_bytes = uploaded_bytes
-    st.caption("Sostituisci file corrente o scarica il template.")
+    st.caption("Replace current file or download the template.")
 
     if not file_bytes:
-        st.info("Carica il file Excel per iniziare.")
+        st.info("Upload the Excel file to get started.")
         st.stop()
 
     try:
@@ -991,81 +1076,100 @@ with st.sidebar:
         st.error(str(e))
         st.stop()
 
-    # Legenda team (usa profili aggiornati)
+    # Team legend
     st.divider()
     st.markdown("**Team**")
     df_team_side = get_team_df()
     if not df_team_side.empty:
-        color_map = {row["nome"]: PALETTE[i % len(PALETTE)]
-                     for i, row in df_team_side.iterrows()}
+        color_map_side = {row["nome"]: PALETTE[i % len(PALETTE)]
+                         for i, row in df_team_side.iterrows()}
         has_ruolo = "ruolo" in df_team_side.columns
         for _, row in df_team_side.iterrows():
             c1, c2 = st.columns([1, 5])
-            c1.markdown(avatar_html(row["nome"], color_map[row["nome"]]), unsafe_allow_html=True)
-            label = row["ruolo"] if has_ruolo else row.get("seniority","")
+            c1.markdown(avatar_html(row["nome"], color_map_side[row["nome"]]), unsafe_allow_html=True)
+            label = row["ruolo"] if has_ruolo else row.get("seniority", "")
             c2.caption(f"**{row['nome']}**  \n{label}")
+
+    # Subcontractor legend
+    subco_list_side = load_subcontractors()
+    if subco_list_side:
+        st.markdown("**Subcontractors**")
+        for sub in subco_list_side:
+            c1, c2 = st.columns([1, 5])
+            c1.markdown(avatar_html(sub["nome"], SUBCO_COLOR), unsafe_allow_html=True)
+            c2.caption(f"**{sub['nome']}**  \n{sub.get('ruolo','')}")
 
     if _USE_SUPABASE:
         st.divider()
-        if st.button("Esci", use_container_width=True):
+        st.caption("Internal tool · AI_Team · Accenture Song · Data is confidential · Do not share screenshots or exports outside the team.")
+        if st.button("Sign out", use_container_width=True):
             sign_out()
             st.rerun()
 
 
 # ── TABS ──────────────────────────────────────────────────────
-tab_job, tab_profili = st.tabs(["Costruisci il job", "Profili team"])
+tab_job, tab_profili, tab_subco = st.tabs(["Build Job", "Team Profiles", "Subcontractors"])
 
 
 # ════════════════════════════════════════════════════════════════
-# TAB 1 — JOB
+# TAB 1 — BUILD JOB
 # ════════════════════════════════════════════════════════════════
 with tab_job:
     df_team = get_team_df()
-    if df_team.empty:
-        st.warning("Nessun membro nel team. Vai al tab **Profili** per aggiungerli.")
+    subco_list = load_subcontractors()
+    subco_names = {s["nome"] for s in subco_list}
+    subco_rate_map = {s["nome"]: clean_float(s.get("costo_orario", 0)) for s in subco_list}
+
+    if df_team.empty and not subco_list:
+        st.warning("No team members found. Go to **Team Profiles** tab to add them.")
         st.stop()
 
     color_map  = {row["nome"]: PALETTE[i % len(PALETTE)] for i, row in df_team.iterrows()}
+    for sname in subco_names:
+        color_map[sname] = SUBCO_COLOR
+
     has_ruolo  = "ruolo" in df_team.columns
-    tutti_nomi = df_team["nome"].tolist()
+    tutti_nomi_internal = df_team["nome"].tolist() if not df_team.empty else []
+    tutti_nomi = tutti_nomi_internal + list(subco_names)
     presets    = load_presets()
 
-    # Nome progetto + preset
+    # ── Project name + preset ──
     top_l, top_r = st.columns([3, 2])
     with top_l:
-        nome_progetto = st.text_input("Nome progetto", placeholder="Es. Nike FW25 — Video Campaign",
+        nome_progetto = st.text_input("Project name", placeholder="e.g. Nike FW25 — Video Campaign",
                                       label_visibility="collapsed")
     with top_r:
-        pc = st.columns([4,1,0.7])
-        preset_options = ["— nessuno —"] + list(presets.keys())
-        saved_sel = st.session_state.get("preset_sel", "— nessuno —")
+        pc = st.columns([4, 1, 0.7])
+        preset_options = ["— none —"] + list(presets.keys())
+        saved_sel = st.session_state.get("preset_sel", "— none —")
         sel_index = preset_options.index(saved_sel) if saved_sel in preset_options else 0
-        preset_sel  = pc[0].selectbox("Preset", preset_options,
+        preset_sel  = pc[0].selectbox("Load preset", preset_options,
                                        index=sel_index,
                                        label_visibility="collapsed")
-        load_clicked = pc[1].button("Carica", use_container_width=True)
-        del_clicked  = pc[2].button("X", use_container_width=True, help="Elimina preset selezionato")
+        load_clicked = pc[1].button("Load", use_container_width=True)
+        del_clicked  = pc[2].button("X", use_container_width=True, help="Delete selected preset")
 
     if "preset_data" not in st.session_state:
         st.session_state.preset_data = {}
     if "job_editor_version" not in st.session_state:
         st.session_state.job_editor_version = 0
-    if load_clicked and preset_sel != "— nessuno —":
+    if load_clicked and preset_sel != "— none —":
         st.session_state.preset_data = presets[preset_sel]
         st.session_state.preset_sel = preset_sel
         st.session_state.job_editor_version += 1
-        st.toast(f"Preset «{preset_sel}» caricato")
+        st.toast(f"Preset «{preset_sel}» loaded")
         st.rerun()
-    if del_clicked and preset_sel != "— nessuno —":
+    if del_clicked and preset_sel != "— none —":
         if _USE_SUPABASE:
             delete_preset_db(preset_sel)
         else:
             del presets[preset_sel]; save_presets(presets)
-        st.session_state.preset_sel = "— nessuno —"
+        st.session_state.preset_sel = "— none —"
         st.session_state.preset_data = {}
         st.session_state.job_editor_version += 1
-        st.toast(f"Preset «{preset_sel}» eliminato")
+        st.toast(f"Preset «{preset_sel}» deleted")
         st.rerun()
+
     pd_data = st.session_state.preset_data
     preset_meta = preset_to_meta(pd_data)
     team_scope_default = [
@@ -1082,20 +1186,32 @@ with tab_job:
         if preset_meta.get("start_date")
         else datetime.now().date()
     )
-    st.markdown(f'<div class="sec-hdr" style="font-size:1.0rem">{ICO_WRENCH} Impostazioni job</div>', unsafe_allow_html=True)
-    s1, s2, s3 = st.columns([1.1, 1.1, 2.8])
+
+    # ── Job type (LCR / UCR) ──
+    chargeable_default = bool(preset_meta.get("chargeable", True))
+    st.markdown(f'<div class="sec-hdr" style="font-size:1.0rem">{ICO_WRENCH} Job settings</div>', unsafe_allow_html=True)
+    job_type_col, s1, s2, s3 = st.columns([1.5, 1.1, 1.1, 2.8])
+    with job_type_col:
+        job_type = st.radio(
+            "Project type",
+            options=["Chargeable (LCR)", "BD / Internal (UCR)"],
+            index=0 if chargeable_default else 1,
+            key="job_type_radio",
+            label_visibility="collapsed",
+        )
+        chargeable = job_type == "Chargeable (LCR)"
     with s1:
-        start_date = st.date_input("Data inizio", value=start_default, key="job_start_date")
+        start_date = st.date_input("Start date", value=start_default, key="job_start_date")
     with s2:
         deadline_value = st.date_input("Deadline", value=deadline_default, key="job_deadline")
     with s3:
         team_scope = st.multiselect(
-            "Team sul job",
+            "Team on job",
             options=tutti_nomi,
             default=team_scope_default,
-            format_func=lambda n: f"{initials(n)}  {n}",
-            placeholder="Seleziona chi lavorerà sul job…",
-            help="Se non selezioni nessuno, il job usa tutto il team.",
+            format_func=lambda n: (f"{initials(n)}  {n} (SUB)" if n in subco_names else f"{initials(n)}  {n}"),
+            placeholder="Select who will work on this job…",
+            help="Leave empty to include the whole team.",
             key="job_team_scope",
         )
         display_team_scope = team_scope or tutti_nomi
@@ -1104,8 +1220,8 @@ with tab_job:
     nomi_disponibili_job = team_scope or tutti_nomi
 
     st.divider()
-    st.markdown(f'<div class="sec-hdr">{ICO_CLIP} Lavorazioni</div>', unsafe_allow_html=True)
-    st.caption("Sezione unica modificabile: se aggiorni l'Excel, le lavorazioni qui si sincronizzano automaticamente al reload.")
+    st.markdown(f'<div class="sec-hdr">{ICO_CLIP} Tasks</div>', unsafe_allow_html=True)
+    st.caption("Set units/hour, quantity and people for each task.")
 
     preset_rows = preset_to_editor_rows(pd_data, df_lav)
     active_rows = build_editor_rows(df_lav, preset_rows)
@@ -1115,23 +1231,23 @@ with tab_job:
 
     if not active_rows.empty:
         h1, h2, h3, h4 = st.columns([3.4, 1.7, 1.8, 4.1])
-        h1.markdown("`Lavorazione`")
-        h2.markdown("`Quantità`")
-        h3.markdown("`Unità/ora`")
-        h4.markdown("`Assegnato a`")
+        h1.markdown("`Task`")
+        h2.markdown("`Qty`")
+        h3.markdown("`Units/hr`")
+        h4.markdown("`Assigned to`")
 
         for row_idx, row in active_rows.iterrows():
             current_names = parse_assigned_people(row.get("assegnato_a", ""), nomi_disponibili_job)
             c1, c2, c3, c4 = st.columns([3.4, 1.7, 1.8, 4.1])
 
             nome = c1.text_input(
-                "Lavorazione",
+                "Task",
                 value=str(row["nome_lavorazione"]),
                 key=f"job_name_{st.session_state.job_editor_version}_{row_idx}",
                 label_visibility="collapsed",
             )
             qty = c2.number_input(
-                "Quantità",
+                "Qty",
                 min_value=0,
                 step=1,
                 value=int(row["quantita"]),
@@ -1139,7 +1255,7 @@ with tab_job:
                 label_visibility="collapsed",
             )
             uph = c3.number_input(
-                "Unità/ora",
+                "Units/hr",
                 min_value=0.1,
                 step=0.1,
                 value=float(row["unita_ora"]),
@@ -1147,12 +1263,12 @@ with tab_job:
                 label_visibility="collapsed",
             )
             selected_names = c4.multiselect(
-                "Assegnato a",
+                "Assigned to",
                 options=nomi_disponibili_job,
                 default=current_names,
-                format_func=lambda n: f"{initials(n)}  {n}",
+                format_func=lambda n: (f"{initials(n)}  {n} (SUB)" if n in subco_names else f"{initials(n)}  {n}"),
                 key=f"assign_{st.session_state.job_editor_version}_{row_idx}",
-                placeholder="Seleziona una o piu persone...",
+                placeholder="Select one or more people...",
                 label_visibility="collapsed",
             )
 
@@ -1170,26 +1286,30 @@ with tab_job:
         uph = clean_float(row.get("unita_ora"))
         qty = clean_int(row.get("quantita"))
         assigned = parse_assigned_people(row.get("assegnato_a", ""), nomi_disponibili_job)
+        cpu = clean_float(row.get("costo_per_unita", 0))
 
         if qty > 0 and assigned and uph > 0:
+            prod_cost = qty * RETRY_MULTIPLIER * cpu if cpu > 0 else 0.0
             job_items.append({
                 "nome": nome,
                 "uph": uph,
                 "fase": str(row.get("sottocategoria", "")).strip(),
                 "quantita": qty,
                 "assigned": assigned,
+                "costo_per_unita": cpu,
+                "prod_cost": prod_cost,
             })
 
-    # Salva preset
-    with st.expander("Salva come preset"):
-        sc = st.columns([3,1])
-        pname = sc[0].text_input("Nome", value=nome_progetto or "",
-                                  placeholder="Es. Nike FW25", label_visibility="collapsed")
-        if sc[1].button("Salva", use_container_width=True):
+    # ── Save preset ──
+    with st.expander("Save as preset"):
+        sc = st.columns([3, 1])
+        pname = sc[0].text_input("Name", value=nome_progetto or "",
+                                  placeholder="e.g. Nike FW25", label_visibility="collapsed")
+        if sc[1].button("Save", use_container_width=True):
             if not pname.strip():
-                st.warning("Inserisci un nome")
+                st.warning("Enter a preset name")
             elif active_rows.empty:
-                st.warning("Nessuna lavorazione da salvare")
+                st.warning("No tasks to save")
             else:
                 snap_rows = []
                 for _, row in active_rows.iterrows():
@@ -1209,6 +1329,7 @@ with tab_job:
                         "start_date": start_date.isoformat(),
                         "deadline": deadline_value.isoformat(),
                         "team_scope": team_scope,
+                        "chargeable": chargeable,
                     },
                     "rows": snap_rows,
                 }
@@ -1216,32 +1337,66 @@ with tab_job:
                     save_preset_db(pname.strip(), snap)
                 else:
                     presets[pname.strip()] = snap; save_presets(presets)
-                st.success(f"Preset «{pname.strip()}» salvato")
+                st.success(f"Preset «{pname.strip()}» saved")
 
-    # Risultati
+    # ── Results ──
     st.divider()
-    label = f"Stima{' — ' + nome_progetto if nome_progetto else ''}"
+    label = f"Results{' — ' + nome_progetto if nome_progetto else ''}"
     st.markdown(f'<div class="sec-hdr" style="font-size:1.3rem">{ICO_FILE} {label}</div>', unsafe_allow_html=True)
 
     if not job_items:
-        st.info("Inserisci almeno una quantità e assegna una persona per vedere la stima.")
+        st.info("Enter at least one quantity and assign a person to see the estimate.")
     else:
-        ore_base_tot = ore_effort_tot = ore_reali_tot = costo_totale = 0.0
-        ore_pp: dict[str,float] = {}; costo_pp: dict[str,float] = {}
+        ore_base_tot = ore_effort_tot = ore_reali_tot = 0.0
+        ore_pp: dict[str, float]       = {}
+        costo_pp_internal: dict[str, float] = {}
+        costo_pp_subco: dict[str, float]    = {}
+        costo_pp_prod: dict[str, float]     = {}
         phase_rows = []
+        prod_cost_total = 0.0
 
         for it in job_items:
-            ob = it["quantita"] / it["uph"]
-            n  = len(it["assigned"])
+            ob  = it["quantita"] / it["uph"]
+            n   = len(it["assigned"])
             or_ = ob / n
-            ore_base_tot += ob; ore_effort_tot += ob; ore_reali_tot += or_
+            ore_base_tot   += ob
+            ore_effort_tot += ob
+            ore_reali_tot  += or_
+            prod_cost_total += it.get("prod_cost", 0.0)
+
             for nome in it["assigned"]:
-                t = float(df_team.loc[df_team["nome"]==nome,"costo_orario"].iloc[0])
-                ore_pp[nome]   = ore_pp.get(nome,0)   + or_
-                costo_pp[nome] = costo_pp.get(nome,0) + or_ * t
-                costo_totale  += or_ * t
-            phase = str(it.get("fase") or "").strip() or "ALTRO"
+                ore_pp[nome] = ore_pp.get(nome, 0) + or_
+
+                if nome in subco_names:
+                    rate = subco_rate_map.get(nome, 0.0)
+                    costo_pp_subco[nome] = costo_pp_subco.get(nome, 0) + or_ * rate
+                else:
+                    ruolo = ""
+                    if has_ruolo and not df_team.empty:
+                        match = df_team.loc[df_team["nome"] == nome, "ruolo"]
+                        if not match.empty:
+                            ruolo = str(match.iloc[0])
+                    if ruolo == "Intern":
+                        rate = 0.0
+                    elif chargeable:
+                        lcr_col = df_team.loc[df_team["nome"] == nome, "costo_lcr"] if not df_team.empty else pd.Series()
+                        rate = clean_float(lcr_col.iloc[0]) if not lcr_col.empty else 0.0
+                    else:
+                        ucr_col = df_team.loc[df_team["nome"] == nome, "costo_ucr"] if not df_team.empty else pd.Series()
+                        rate = clean_float(ucr_col.iloc[0]) if not ucr_col.empty else 0.0
+                    costo_pp_internal[nome] = costo_pp_internal.get(nome, 0) + or_ * rate
+
+            phase = str(it.get("fase") or "").strip() or "OTHER"
             phase_rows.append({"fase": phase, "ore_effort": ob, "ore_reali": or_})
+
+        # Accumulate prod cost per task (summary only, not per-person)
+        for it in job_items:
+            if it.get("prod_cost", 0) > 0:
+                costo_pp_prod[it["nome"]] = costo_pp_prod.get(it["nome"], 0) + it["prod_cost"]
+
+        internal_cost = sum(costo_pp_internal.values())
+        subco_cost    = sum(costo_pp_subco.values())
+        costo_totale  = internal_cost + subco_cost + prod_cost_total
 
         giorni_reali  = ore_reali_tot / ORE_GIORNATA
         giorni_effort = ore_effort_tot / ORE_GIORNATA
@@ -1249,11 +1404,8 @@ with tab_job:
         giorni_per_persona = []
         for nome in nomi_c:
             ore_persona = float(ore_pp.get(nome, 0.0))
-            if ore_persona <= 0:
-                continue
-            capacita_giornaliera = ORE_GIORNATA
-            if capacita_giornaliera > 0:
-                giorni_per_persona.append(ore_persona / capacita_giornaliera)
+            if ore_persona > 0:
+                giorni_per_persona.append(ore_persona / ORE_GIORNATA)
         giorni_cal = max(giorni_per_persona) if giorni_per_persona else None
 
         phase_df = pd.DataFrame(phase_rows)
@@ -1269,28 +1421,62 @@ with tab_job:
         daily_capacity = (len(scope_people) * ORE_GIORNATA) if scope_people else 0.0
         required_per_day = (ore_effort_tot / days) if days > 0 else None
 
+        rate_label = "LCR" if chargeable else "UCR (BD)"
+
+        # KPI bento row
         st.markdown('<section class="bento-board">', unsafe_allow_html=True)
         st.markdown(
             (
                 '<div class="bento-kpis">'
-                f'{bento_kpi_html("Tempo reale", fmt_hours(ore_reali_tot), f"{giorni_reali:.1f} gg persone")}'
-                f'{bento_kpi_html("Costo stimato", fmt_currency(costo_totale), "Basato su costo orario del team")}'
-                f'{bento_kpi_html("Effort totale", fmt_hours(ore_effort_tot), f"{giorni_effort:.1f} gg effort")}'
-                f'{bento_kpi_html("Durata calendario", fmt_workdays_ceil(giorni_cal) if giorni_cal else "—", "Con assegnazioni attuali")}'
+                f'{bento_kpi_html("Elapsed MD", fmt_hours(ore_reali_tot), f"{giorni_reali:.1f} person days")}'
+                f'{bento_kpi_html(f"Estimated cost [{rate_label}]", fmt_currency(costo_totale), "Internal + Subco + Production")}'
+                f'{bento_kpi_html("Total effort", fmt_hours(ore_effort_tot), f"{giorni_effort:.1f} effort days")}'
+                f'{bento_kpi_html("Calendar duration", fmt_workdays_ceil(giorni_cal) if giorni_cal else "—", "Based on current assignments")}'
                 '</div>'
             ),
             unsafe_allow_html=True,
         )
+
+        # Cost breakdown card
+        st.markdown(
+            (
+                '<div class="cost-breakdown">'
+                '<div class="bento-card-hdr">'
+                '<div class="bento-card-title">Cost breakdown</div>'
+                f'<div class="bento-card-tag">{html.escape(rate_label)}</div>'
+                '</div>'
+                '<div class="cost-row">'
+                f'<span>Internal team cost <span class="cost-row-tag">{html.escape(rate_label)}</span></span>'
+                f'<strong>{html.escape(fmt_currency(internal_cost))}</strong>'
+                '</div>'
+                '<div class="cost-row">'
+                '<span>Subcontractor cost <span class="cost-row-tag">LCR</span></span>'
+                f'<strong>{html.escape(fmt_currency(subco_cost))}</strong>'
+                '</div>'
+                '<div class="cost-row">'
+                f'<span>Production cost (API) <span class="cost-row-tag">LCR</span></span>'
+                f'<strong>{html.escape(fmt_currency(prod_cost_total))}</strong>'
+                '</div>'
+                '<div class="cost-divider"></div>'
+                '<div class="cost-total">'
+                '<span>TOTAL JOB COST</span>'
+                f'<span>{html.escape(fmt_currency(costo_totale))}</span>'
+                '</div>'
+                '</div>'
+            ),
+            unsafe_allow_html=True,
+        )
+
         st.markdown('<div class="bento-row2">', unsafe_allow_html=True)
 
         c_left, c_right = st.columns([1.55, 1.0])
         with c_left:
-            phase_meta = f"{len(phase_df)} fasi" if not phase_df.empty else "Nessuna fase"
+            phase_meta = f"{len(phase_df)} phases" if not phase_df.empty else "No phase data"
             st.markdown(
                 (
                     '<div class="bento-card">'
                     '<div class="bento-card-hdr">'
-                    '<div class="bento-card-title">Distribuzione effort per fase</div>'
+                    '<div class="bento-card-title">Effort distribution by phase</div>'
                     f'<div class="bento-card-tag">{html.escape(phase_meta)}</div>'
                     '</div>'
                     f'{phase_bars_html(phase_df)}'
@@ -1304,7 +1490,7 @@ with tab_job:
                 (
                     '<div class="bento-card">'
                     '<div class="bento-card-hdr">'
-                    '<div class="bento-card-title">Piano entro deadline</div>'
+                    '<div class="bento-card-title">Plan within deadline</div>'
                     '<div class="bento-card-tag">Capacity check</div>'
                     '</div>'
                 ),
@@ -1312,74 +1498,112 @@ with tab_job:
             )
             if days <= 0:
                 st.markdown(
-                    '<p class="bento-plan-stat">Imposta una <strong>data inizio</strong> e una <strong>deadline</strong> valide.</p>',
+                    '<p class="bento-plan-stat">Set a valid <strong>start date</strong> and <strong>deadline</strong>.</p>',
                     unsafe_allow_html=True,
                 )
             else:
                 st.markdown(
                     (
-                        f'<p class="bento-plan-stat">Finestra: <strong>{days} gg lavorativi</strong></p>'
-                        f'<p class="bento-plan-stat">Capacità team: <strong>{daily_capacity:.1f} h/giorno</strong></p>'
-                        f'<p class="bento-plan-stat">Effort richiesto: <strong>{required_per_day:.1f} h/giorno</strong></p>'
+                        f'<p class="bento-plan-stat">Window: <strong>{days} working days</strong></p>'
+                        f'<p class="bento-plan-stat">Team capacity: <strong>{daily_capacity:.1f} h/day</strong></p>'
+                        f'<p class="bento-plan-stat">Required effort: <strong>{required_per_day:.1f} h/day</strong></p>'
                     ),
                     unsafe_allow_html=True,
                 )
 
             st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-            if st.button("Calcola piano", use_container_width=True):
+            if st.button("Calculate plan", use_container_width=True):
                 if daily_capacity <= 0:
-                    st.warning("Capacità team nulla. Controlla disponibilità/Team sul job.")
+                    st.warning("Team capacity is zero. Check availability / Team on job.")
                 elif days <= 0:
-                    st.warning("La finestra temporale non è valida.")
+                    st.warning("The time window is not valid.")
                 else:
                     gap = ore_effort_tot - (daily_capacity * days)
                     if gap <= 0:
-                        st.success("Con il team selezionato sei dentro deadline (sulla base dell'effort).")
+                        st.success("The team can meet the deadline based on current effort.")
                     else:
                         avg_person_day = ORE_GIORNATA if scope_people else 0
                         extra_people = int((gap / (avg_person_day * days)) + 0.999) if avg_person_day > 0 else None
-                        st.warning(f"Serve più capacità: mancano ~**{gap:.1f} h** entro deadline.")
+                        st.warning(f"More capacity needed: ~**{gap:.1f} h** missing by deadline.")
                         if extra_people is not None:
-                            st.caption(f"Stima: aggiungi ~**{extra_people}** persone (con capacità media) oppure aumenta disponibilità.")
+                            st.caption(f"Estimate: add ~**{extra_people}** people (average capacity) or increase availability.")
             st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('</div></section>', unsafe_allow_html=True)
 
-        with st.expander("Dettaglio per persona"):
-            st.dataframe(pd.DataFrame([{
-                "Nome": n,
-                "Ruolo": df_team.loc[df_team["nome"]==n,"ruolo"].iloc[0] if has_ruolo else "",
-                "Ore": round(ore_pp[n],1),
-                "Giorni": round(ore_pp[n]/ORE_GIORNATA,1),
-                "Costo": f"€ {costo_pp[n]:,.0f}",
-            } for n in sorted(ore_pp)]), hide_index=True, use_container_width=True)
+        # ── Breakdown by person ──
+        all_assigned = sorted(ore_pp.keys())
+        with st.expander("Breakdown by person"):
+            bp_rows = []
+            for n in all_assigned:
+                is_subco = n in subco_names
+                is_intern = False
+                ruolo = ""
+                if not is_subco and has_ruolo and not df_team.empty:
+                    match = df_team.loc[df_team["nome"] == n, "ruolo"]
+                    if not match.empty:
+                        ruolo = str(match.iloc[0])
+                        is_intern = ruolo == "Intern"
+                cost_val = costo_pp_internal.get(n, 0) + costo_pp_subco.get(n, 0)
+                bp_rows.append({
+                    "Name": n,
+                    "Type": "SUB" if is_subco else ("Intern" if is_intern else "Internal"),
+                    "Role": ruolo if not is_subco else next((s.get("ruolo","") for s in subco_list if s["nome"]==n), ""),
+                    "Rate": "LCR" if is_subco else ("—" if is_intern else rate_label),
+                    "Hours": round(ore_pp[n], 1),
+                    "Days": round(ore_pp[n] / ORE_GIORNATA, 1),
+                    "Cost": f"€ {cost_val:,.0f}" if cost_val > 0 else "—",
+                })
+            st.dataframe(pd.DataFrame(bp_rows), hide_index=True, use_container_width=True)
 
-        with st.expander("Dettaglio per lavorazione"):
-            st.dataframe(pd.DataFrame([{
-                "Lavorazione": it["nome"], "Qta": it["quantita"], "Unità/ora": it["uph"],
-                "Ore base": round(it["quantita"]/it["uph"],1),
-                "Giorni reali": round(it["quantita"]/it["uph"]/len(it["assigned"])/ORE_GIORNATA,1),
-                "Assegnato a": ", ".join(it["assigned"]),
-            } for it in job_items]), hide_index=True, use_container_width=True)
+        # ── Breakdown by task ──
+        with st.expander("Breakdown by task"):
+            bt_rows = []
+            for it in job_items:
+                row_d = {
+                    "Task": it["nome"],
+                    "Qty": it["quantita"],
+                    "Units/hr": it["uph"],
+                    "Base hrs": round(it["quantita"] / it["uph"], 1),
+                    "Working days": round(it["quantita"] / it["uph"] / max(len(it["assigned"]), 1) / ORE_GIORNATA, 1),
+                    "Assigned to": ", ".join(it["assigned"]),
+                }
+                if it.get("prod_cost", 0) > 0:
+                    row_d["Prod cost (API)"] = f"€ {it['prod_cost']:,.2f} (×{RETRY_MULTIPLIER} retry)"
+                bt_rows.append(row_d)
+            st.dataframe(pd.DataFrame(bt_rows), hide_index=True, use_container_width=True)
 
         st.divider()
-        excel_b = build_export_excel(nome_progetto or "Stima", job_items,
-                                      ore_pp, costo_pp, costo_totale,
-                                      ore_reali_tot, giorni_reali, df_team)
-        st.download_button(f"Esporta stima in Excel", data=excel_b,
-                           file_name=f"stima_{(nome_progetto or 'job').replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                           use_container_width=True)
+        all_ore_pp = dict(ore_pp)
+        excel_b = build_export_excel(
+            nome_progetto or "Estimate",
+            job_items,
+            all_ore_pp,
+            costo_pp_internal,
+            costo_pp_subco,
+            costo_pp_prod,
+            costo_totale,
+            ore_reali_tot,
+            giorni_reali,
+            df_team,
+            chargeable,
+        )
+        st.download_button(
+            "Export to Excel",
+            data=excel_b,
+            file_name=f"estimate_{(nome_progetto or 'job').replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
 
 
 # ════════════════════════════════════════════════════════════════
-# TAB 2 — PROFILI
+# TAB 2 — TEAM PROFILES
 # ════════════════════════════════════════════════════════════════
 with tab_profili:
-    st.markdown(f'<div class="sec-hdr">{ICO_USERS} Profili team</div>', unsafe_allow_html=True)
-    st.caption("Aggiungi, modifica o rimuovi membri del team. Le modifiche sostituiscono i dati dell'Excel.")
+    st.markdown(f'<div class="sec-hdr">{ICO_USERS} Team Profiles</div>', unsafe_allow_html=True)
+    st.caption("Add, edit or remove team members. Changes override the Excel data.")
 
-    # Carica profili (da JSON o da Excel come base)
     profiles = load_profiles()
     if profiles is None:
         try:
@@ -1388,30 +1612,34 @@ with tab_profili:
             profiles = []
 
     df_prof = pd.DataFrame(profiles) if profiles else pd.DataFrame(
-        columns=["id","nome","ruolo","seniority","costo_orario","skill_tags","disponibilita_h_settimana"]
+        columns=["id","nome","ruolo","seniority","costo_lcr","costo_ucr","skill_tags","disponibilita_h_settimana"]
     )
 
-    # Assicura colonne minime
-    for col in ["nome","ruolo","seniority","costo_orario","skill_tags","disponibilita_h_settimana"]:
+    # Ensure minimum columns — migrate costo_orario → costo_lcr if needed
+    if "costo_lcr" not in df_prof.columns:
+        df_prof["costo_lcr"] = pd.to_numeric(df_prof.get("costo_orario", 0), errors="coerce").fillna(0)
+    if "costo_ucr" not in df_prof.columns:
+        df_prof["costo_ucr"] = 0.0
+    for col in ["nome","ruolo","seniority","skill_tags","disponibilita_h_settimana"]:
         if col not in df_prof.columns:
             df_prof[col] = ""
 
-    st.markdown(f'<div class="sec-hdr" style="font-size:0.95rem;font-weight:600;color:var(--fg)">{ICO_WRENCH} Membri del team</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sec-hdr" style="font-size:0.95rem;font-weight:600;color:var(--fg)">{ICO_WRENCH} Team members</div>', unsafe_allow_html=True)
 
     edited_prof = st.data_editor(
-        df_prof[["nome","ruolo","seniority","costo_orario","skill_tags","disponibilita_h_settimana"]],
+        df_prof[["nome","ruolo","seniority","costo_lcr","costo_ucr","skill_tags","disponibilita_h_settimana"]],
         column_config={
-            "nome":   st.column_config.TextColumn("Nome", width="medium"),
-            "ruolo":  st.column_config.SelectboxColumn("Ruolo", options=RUOLI_OPTIONS, width="large"),
-            "seniority": st.column_config.SelectboxColumn("Seniority",
-                                                           options=SENIORITY_OPTIONS, width="small"),
-            "costo_orario": st.column_config.NumberColumn("€/ora", min_value=0, step=1, width="small"),
+            "nome":   st.column_config.TextColumn("Name", width="medium"),
+            "ruolo":  st.column_config.SelectboxColumn("Role", options=RUOLI_OPTIONS, width="large"),
+            "seniority": st.column_config.SelectboxColumn("Seniority", options=SENIORITY_OPTIONS, width="small"),
+            "costo_lcr": st.column_config.NumberColumn("LCR €/h", min_value=0, step=1, width="small"),
+            "costo_ucr": st.column_config.NumberColumn("UCR €/h", min_value=0, step=1, width="small"),
             "skill_tags": st.column_config.TextColumn(
                 "Skill", width="large",
-                help="Skill separate da virgola. Es: retouch,compositing,video"
+                help="Comma-separated skills. E.g: retouch,compositing,video"
             ),
             "disponibilita_h_settimana": st.column_config.NumberColumn(
-                "H/settimana", min_value=0, max_value=40, step=4, width="small"
+                "H/week", min_value=0, max_value=40, step=4, width="small"
             ),
         },
         num_rows="dynamic",
@@ -1421,8 +1649,8 @@ with tab_profili:
         key="prof_editor",
     )
 
-    # Anteprima avatar
-    st.caption("Anteprima")
+    # Avatar preview
+    st.caption("Preview")
     valid_rows = edited_prof[edited_prof["nome"].notna() & (edited_prof["nome"].str.strip() != "")]
     if not valid_rows.empty:
         chips = ""
@@ -1430,42 +1658,124 @@ with tab_profili:
             color = PALETTE[idx % len(PALETTE)]
             full = row["nome"]
             ruolo = str(row.get("ruolo", "")).strip()
+            is_intern = ruolo == "Intern"
             chips += (
                 f'<div style="display:inline-flex;align-items:center;gap:6px;'
                 f'background:oklch(0.9819 0.0181 155.8263);border-radius:20px;padding:4px 10px 4px 4px;margin:3px;">'
                 f'{avatar_html(row["nome"], color, size=26)}'
                 f'<span style="font-size:13px;font-weight:500">{full}</span>'
-                f'<span style="font-size:11px;color:var(--muted-fg)">{ruolo}</span>'
+                f'<span style="font-size:11px;color:var(--muted-fg)">{ruolo}'
+                f'{" · zero cost" if is_intern else ""}'
+                f'</span>'
                 f'</div>'
             )
         st.markdown(f'<div style="display:flex;flex-wrap:wrap;gap:2px">{chips}</div>', unsafe_allow_html=True)
     else:
-        st.caption("Nessun membro ancora.")
+        st.caption("No members yet.")
 
     st.divider()
-    sc = st.columns([2,1,1])
-    if sc[0].button("Salva profili", use_container_width=True, type="primary"):
+    sc = st.columns([2, 1, 1])
+    if sc[0].button("Save profiles", use_container_width=True, type="primary"):
         clean = edited_prof[edited_prof["nome"].notna() & (edited_prof["nome"].str.strip() != "")].copy()
-        clean["costo_orario"] = pd.to_numeric(clean["costo_orario"], errors="coerce").fillna(0)
+        clean["costo_lcr"] = pd.to_numeric(clean["costo_lcr"], errors="coerce").fillna(0)
+        clean["costo_ucr"] = pd.to_numeric(clean["costo_ucr"], errors="coerce").fillna(0)
         clean["disponibilita_h_settimana"] = pd.to_numeric(
             clean["disponibilita_h_settimana"], errors="coerce").fillna(40)
         clean["id"] = range(1, len(clean)+1)
         save_profiles(clean.to_dict("records"))
         load_team_from_excel.clear()
-        st.success("Profili salvati")
+        st.success("Profiles saved")
         st.rerun()
 
     if not _USE_SUPABASE:
-        if sc[1].button("Ripristina da Excel", use_container_width=True):
+        if sc[1].button("Restore from Excel", use_container_width=True):
             if os.path.exists(PROFILES_FILE):
                 os.remove(PROFILES_FILE)
-                st.toast("Profili ripristinati dall'Excel")
+                st.toast("Profiles restored from Excel")
                 st.rerun()
             else:
-                st.info("Stai già usando i dati dall'Excel.")
+                st.info("Already using Excel data.")
         if os.path.exists(PROFILES_FILE):
-            sc[2].markdown(f'<div class="status-label">{ICO_CHECK} Profili personalizzati attivi</div>', unsafe_allow_html=True)
+            sc[2].markdown(f'<div class="status-label">{ICO_CHECK} Custom profiles active</div>', unsafe_allow_html=True)
         else:
-            sc[2].markdown(f'<div class="status-label">{ICO_FILE} Dati da Excel</div>', unsafe_allow_html=True)
+            sc[2].markdown(f'<div class="status-label">{ICO_FILE} Data from Excel</div>', unsafe_allow_html=True)
     else:
         sc[2].markdown(f'<div class="status-label">{ICO_CHECK} Supabase</div>', unsafe_allow_html=True)
+
+
+# ════════════════════════════════════════════════════════════════
+# TAB 3 — SUBCONTRACTORS
+# ════════════════════════════════════════════════════════════════
+with tab_subco:
+    st.markdown(f'<div class="sec-hdr">{ICO_SUBCO} Subcontractors</div>', unsafe_allow_html=True)
+    st.caption("External collaborators with a single LCR rate. Shown with a pink avatar in task assignment.")
+
+    subcos = load_subcontractors()
+    df_subco = pd.DataFrame(subcos) if subcos else pd.DataFrame(
+        columns=["id","nome","ruolo","costo_orario","skill_tags","disponibilita_h_settimana"]
+    )
+    for col in ["nome","ruolo","costo_orario","skill_tags","disponibilita_h_settimana"]:
+        if col not in df_subco.columns:
+            df_subco[col] = "" if col in ("nome","ruolo","skill_tags") else 0
+
+    st.markdown(f'<div class="sec-hdr" style="font-size:0.95rem;font-weight:600;color:var(--fg)">{ICO_WRENCH} Subcontractor list</div>', unsafe_allow_html=True)
+
+    edited_subco = st.data_editor(
+        df_subco[["nome","ruolo","costo_orario","skill_tags","disponibilita_h_settimana"]],
+        column_config={
+            "nome":   st.column_config.TextColumn("Name", width="medium"),
+            "ruolo":  st.column_config.TextColumn("Role", width="large"),
+            "costo_orario": st.column_config.NumberColumn("€/h (LCR)", min_value=0, step=1, width="small"),
+            "skill_tags": st.column_config.TextColumn(
+                "Skill", width="large",
+                help="Comma-separated skills."
+            ),
+            "disponibilita_h_settimana": st.column_config.NumberColumn(
+                "H/week", min_value=0, max_value=40, step=4, width="small"
+            ),
+        },
+        num_rows="dynamic",
+        hide_index=True,
+        use_container_width=True,
+        height=editor_height(len(df_subco), min_rows=3, row_px=38, chrome_px=90),
+        key="subco_editor",
+    )
+
+    # Preview
+    st.caption("Preview")
+    valid_subco = edited_subco[edited_subco["nome"].notna() & (edited_subco["nome"].str.strip() != "")]
+    if not valid_subco.empty:
+        chips = ""
+        for _, row in valid_subco.iterrows():
+            full  = row["nome"]
+            ruolo = str(row.get("ruolo", "")).strip()
+            chips += (
+                f'<div style="display:inline-flex;align-items:center;gap:6px;'
+                f'background:#fdf2f8;border:1px solid #fbcfe8;border-radius:20px;padding:4px 10px 4px 4px;margin:3px;">'
+                f'{avatar_html(full, SUBCO_COLOR, size=26)}'
+                f'<span style="font-size:13px;font-weight:500">{html.escape(full)}</span>'
+                f'<span style="font-size:11px;color:#be185d">{html.escape(ruolo)}</span>'
+                f'</div>'
+            )
+        st.markdown(f'<div style="display:flex;flex-wrap:wrap;gap:2px">{chips}</div>', unsafe_allow_html=True)
+    else:
+        st.caption("No subcontractors yet.")
+
+    st.divider()
+    ss = st.columns([2, 1])
+    if ss[0].button("Save subcontractors", use_container_width=True, type="primary"):
+        clean_s = edited_subco[edited_subco["nome"].notna() & (edited_subco["nome"].str.strip() != "")].copy()
+        clean_s["costo_orario"] = pd.to_numeric(clean_s["costo_orario"], errors="coerce").fillna(0)
+        clean_s["disponibilita_h_settimana"] = pd.to_numeric(
+            clean_s["disponibilita_h_settimana"], errors="coerce").fillna(40)
+        clean_s["id"] = range(1, len(clean_s)+1)
+        save_subcontractors(clean_s.to_dict("records"))
+        st.success("Subcontractors saved")
+        st.rerun()
+
+    if not _USE_SUPABASE:
+        if ss[1].button("Clear list", use_container_width=True):
+            if os.path.exists(SUBCO_FILE):
+                os.remove(SUBCO_FILE)
+                st.toast("Subcontractor list cleared")
+                st.rerun()

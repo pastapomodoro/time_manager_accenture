@@ -1,9 +1,4 @@
-"""
-Entry point per Streamlit Community Cloud (campo predefinito: streamlit_app.py).
-
-Avvia l'AI Team Estimator. Per il solo CM1 Estimator imposta come main file
-`cm1_estimator.py` nelle impostazioni dell'app su share.streamlit.io.
-"""
+"""Entry point for Streamlit Community Cloud (default file: streamlit_app.py)."""
 
 from pathlib import Path
 import runpy

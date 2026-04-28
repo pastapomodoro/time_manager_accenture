@@ -173,3 +173,18 @@ def upload_xlsx_to_storage(file_bytes: bytes):
         pass
     sb.storage.from_(BUCKET).upload(XLSX_PATH, file_bytes,
                                     file_options={"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})
+
+
+# ── SUBCONTRACTORS ─────────────────────────────────────────────
+
+def load_subcontractors_db() -> list[dict]:
+    rows = get_supabase().table("subcontractors").select("*").order("id").execute()
+    return rows.data or []
+
+
+def save_subcontractors_db(subcos: list[dict]):
+    sb = get_supabase()
+    sb.table("subcontractors").delete().neq("id", 0).execute()
+    if subcos:
+        rows = [{k: v for k, v in s.items() if k != "id"} for s in subcos]
+        sb.table("subcontractors").insert(rows).execute()
