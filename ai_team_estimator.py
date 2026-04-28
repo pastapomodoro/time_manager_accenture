@@ -885,6 +885,7 @@ def build_results_html(
     chargeable, job_items, df_team, subco_list,
     ore_pp, costo_pp_internal, costo_pp_subco,
     prod_cost_total, costo_totale, giorni_cal,
+    deliverables_img: int = 0, deliverables_vid: int = 0,
 ) -> str:
     PAL_JS  = json.dumps(["#7C3AED","#2563EB","#059669","#D97706","#DC2626","#0891B2","#65A30D","#C026D3","#EA580C","#0F766E"])
     PINK_JS = "#EC4899"
@@ -896,6 +897,13 @@ def build_results_html(
     elapsed_h     = sum(ore_pp.values())
     cal_days      = math.ceil(giorni_cal) if giorni_cal else 0
     total_qty_assets = sum(it["quantita"] for it in job_items) or 1
+    # Deliverables: use override or auto-compute from AI gen tasks
+    _img_kw = ("image generation", "immagine")
+    _vid_kw = ("video generation", "video gen")
+    auto_img = sum(it["quantita"] for it in job_items if any(k in it["nome"].lower() for k in _img_kw))
+    auto_vid = sum(it["quantita"] for it in job_items if any(k in it["nome"].lower() for k in _vid_kw))
+    del_img  = deliverables_img if deliverables_img > 0 else auto_img
+    del_vid  = deliverables_vid if deliverables_vid > 0 else auto_vid
 
     # Build per-person rates for both LCR and UCR so JS can toggle
     rates_lcr: dict[str, float] = {}
@@ -1039,6 +1047,25 @@ tbody tr:hover{{background:var(--bg);}}
 .pill-s{{background:var(--accent);color:var(--accent-fg);}}
 .pill-sub{{background:#fdf2f8;color:#be185d;border:1px solid #fbcfe8;}}
 .muted{{color:var(--muted);}}
+/* ── DELIVERABLES ── */
+.dlv{{display:flex;gap:12px;margin-bottom:10px;}}
+.dlv-card{{flex:1;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;}}
+.dlv-icon{{font-size:20px;line-height:1;}}
+.dlv-num{{font-size:1.4rem;font-weight:800;letter-spacing:-.03em;}}
+.dlv-lbl{{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}}
+/* ── MARKUPS ── */
+.markup-row{{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}}
+.markup-row:last-child{{border-bottom:none;}}
+.markup-left{{display:flex;align-items:center;gap:10px;}}
+.markup-chk{{width:16px;height:16px;accent-color:var(--primary);cursor:pointer;flex-shrink:0;}}
+.markup-name{{font-size:12px;font-weight:600;}}
+.markup-pct{{font-size:11px;color:var(--muted);margin-left:4px;}}
+.markup-right{{text-align:right;}}
+.markup-val{{font-size:13px;font-weight:700;color:var(--muted);transition:color .2s;}}
+.markup-val.active{{color:var(--fg);}}
+.grand-total{{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:6px;border-top:3px solid var(--primary);}}
+.grand-total-lbl{{font-size:13px;font-weight:800;letter-spacing:.02em;}}
+.grand-total-val{{font-size:1.5rem;font-weight:800;letter-spacing:-.04em;color:var(--primary-d);}}
 </style>
 </head>
 <body>
@@ -1116,6 +1143,72 @@ tbody tr:hover{{background:var(--bg);}}
   </div>
 </div>
 
+<!-- DELIVERABLES -->
+<div class="sec">Deliverables</div>
+<div class="dlv">
+  <div class="dlv-card">
+    <div class="dlv-icon">🖼️</div>
+    <div>
+      <div class="dlv-num">{del_img}</div>
+      <div class="dlv-lbl">AI images</div>
+    </div>
+  </div>
+  <div class="dlv-card">
+    <div class="dlv-icon">🎬</div>
+    <div>
+      <div class="dlv-num">{del_vid}</div>
+      <div class="dlv-lbl">AI videos</div>
+    </div>
+  </div>
+  <div class="dlv-card" style="flex:2">
+    <div>
+      <div class="dlv-num">{del_img + del_vid}</div>
+      <div class="dlv-lbl">Total generated assets</div>
+    </div>
+  </div>
+</div>
+
+<!-- MARKUPS -->
+<div class="sec">Price markups</div>
+<div class="card" style="margin-bottom:10px;">
+  <div class="card-hdr">
+    <div class="card-title">Optional cost add-ons</div>
+    <div class="card-tag">check to include</div>
+  </div>
+  <div class="markup-row">
+    <div class="markup-left">
+      <input type="checkbox" class="markup-chk" id="chk-pmo" onchange="recomputeMarkup()">
+      <span class="markup-name">PMO</span><span class="markup-pct">2%</span>
+    </div>
+    <div class="markup-right"><div class="markup-val" id="val-pmo">—</div></div>
+  </div>
+  <div class="markup-row">
+    <div class="markup-left">
+      <input type="checkbox" class="markup-chk" id="chk-cap" onchange="recomputeMarkup()">
+      <span class="markup-name">Capital Charges</span><span class="markup-pct">3%</span>
+    </div>
+    <div class="markup-right"><div class="markup-val" id="val-cap">—</div></div>
+  </div>
+  <div class="markup-row">
+    <div class="markup-left">
+      <input type="checkbox" class="markup-chk" id="chk-con" onchange="recomputeMarkup()">
+      <span class="markup-name">Contingency</span><span class="markup-pct">4%</span>
+    </div>
+    <div class="markup-right"><div class="markup-val" id="val-con">—</div></div>
+  </div>
+  <div class="markup-row">
+    <div class="markup-left">
+      <input type="checkbox" class="markup-chk" id="chk-res" onchange="recomputeMarkup()">
+      <span class="markup-name">Reserve (Accantonamento)</span><span class="markup-pct">20%</span>
+    </div>
+    <div class="markup-right"><div class="markup-val" id="val-res">—</div></div>
+  </div>
+  <div class="grand-total">
+    <div class="grand-total-lbl">TOTAL PRICE</div>
+    <div class="grand-total-val" id="grand-total-val">—</div>
+  </div>
+</div>
+
 <!-- CHARTS -->
 <div class="sec">Analysis</div>
 <div class="charts">
@@ -1186,6 +1279,7 @@ function setMode(lcr){{
   document.getElementById("kpi-cost").textContent=feur(total);
   document.getElementById("kpi-per-asset").textContent=feur(total/TOTAL_QTY);
   document.getElementById("total-cost-val").textContent=feur(total);
+  _currentBase=total; recomputeMarkup();
   // update donut
   if(splitChart){{splitChart.data.datasets[0].data=[costInt,SUB_TOTAL,PROD_TOTAL];splitChart.update();}}
   // rebuild person table
@@ -1265,6 +1359,24 @@ function srt(id,col){{
     return _ss[k]?c:-c;
   }});
   rows.forEach(r=>tb.querySelector("tbody").appendChild(r));
+}}
+
+// ── Markups ──
+const MARKUP_RATES = {{pmo:0.02,cap:0.03,con:0.04,res:0.20}};
+let _currentBase = 0;
+function recomputeMarkup(){{
+  const base = _currentBase;
+  const ids = ['pmo','cap','con','res'];
+  let extra = 0;
+  ids.forEach(id=>{{
+    const chk = document.getElementById('chk-'+id);
+    const val = document.getElementById('val-'+id);
+    const amt = base * MARKUP_RATES[id];
+    val.textContent = feur(amt);
+    if(chk.checked){{ val.classList.add('active'); extra += amt; }}
+    else val.classList.remove('active');
+  }});
+  document.getElementById('grand-total-val').textContent = feur(base + extra);
 }}
 
 // ── Init ──
@@ -1496,11 +1608,23 @@ with tab_job:
         active_rows["nome_lavorazione"].fillna("").astype(str).str.strip() != ""
     ].reset_index(drop=True)
 
+    # Units/hr ↔ Units/day toggle
+    rate_mode = st.radio(
+        "Rate mode",
+        options=["Units/hr", "Units/day"],
+        index=st.session_state.get("rate_mode_idx", 0),
+        horizontal=True,
+        label_visibility="collapsed",
+        key="rate_mode_radio",
+    )
+    st.session_state["rate_mode_idx"] = 0 if rate_mode == "Units/hr" else 1
+    use_day_rate = rate_mode == "Units/day"
+
     if not active_rows.empty:
         h1, h2, h3, h4 = st.columns([3.4, 1.7, 1.8, 4.1])
         h1.markdown("`Task`")
         h2.markdown("`Qty`")
-        h3.markdown("`Units/hr`")
+        h3.markdown(f"`{rate_mode}`")
         h4.markdown("`Assigned to`")
 
         for row_idx, row in active_rows.iterrows():
@@ -1521,14 +1645,17 @@ with tab_job:
                 key=f"job_qty_{st.session_state.job_editor_version}_{row_idx}",
                 label_visibility="collapsed",
             )
-            uph = c3.number_input(
-                "Units/hr",
+            uph_hr = float(row["unita_ora"])
+            display_rate = uph_hr * ORE_GIORNATA if use_day_rate else uph_hr
+            disp_val = c3.number_input(
+                rate_mode,
                 min_value=0.1,
                 step=0.1,
-                value=float(row["unita_ora"]),
+                value=round(display_rate, 2),
                 key=f"job_uph_{st.session_state.job_editor_version}_{row_idx}",
                 label_visibility="collapsed",
             )
+            uph = disp_val / ORE_GIORNATA if use_day_rate else disp_val
             selected_names = c4.multiselect(
                 "Assigned to",
                 options=nomi_disponibili_job,
@@ -1605,6 +1732,15 @@ with tab_job:
                 else:
                     presets[pname.strip()] = snap; save_presets(presets)
                 st.success(f"Preset «{pname.strip()}» saved")
+
+    # ── Results ──
+    # ── Deliverables override ──
+    st.divider()
+    st.markdown(f'<div class="sec-hdr">{ICO_CLIP} Deliverables</div>', unsafe_allow_html=True)
+    st.caption("Override how many final assets are delivered. Leave at 0 to auto-count from AI generation tasks.")
+    dv1, dv2 = st.columns(2)
+    deliverables_img = dv1.number_input("AI images delivered", min_value=0, step=1, value=0, key="dlv_img")
+    deliverables_vid = dv2.number_input("AI videos delivered", min_value=0, step=1, value=0, key="dlv_vid")
 
     # ── Results ──
     st.divider()
@@ -1706,8 +1842,10 @@ with tab_job:
             prod_cost_total=prod_cost_total,
             costo_totale=costo_totale,
             giorni_cal=giorni_cal,
+            deliverables_img=int(deliverables_img),
+            deliverables_vid=int(deliverables_vid),
         )
-        components.html(dash_html, height=1080, scrolling=True)
+        components.html(dash_html, height=1200, scrolling=True)
 
         # ── Capacity check ──
         if days > 0:
