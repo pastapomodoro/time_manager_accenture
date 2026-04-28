@@ -93,7 +93,9 @@ def load_profiles_db() -> list[dict]:
     if user_id:
         try:
             rows = query.eq("user_id", user_id).execute()
-            return rows.data or []
+            if rows.data:
+                return rows.data
+            # user_id filter returned nothing — fall through to unfiltered query
         except Exception as exc:
             if "profiles.user_id does not exist" not in str(exc):
                 raise
