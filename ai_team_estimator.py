@@ -1013,6 +1013,8 @@ body{{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--fg
 .kpi-lbl{{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}}
 .kpi-val{{font-size:1.5rem;font-weight:800;letter-spacing:-.04em;color:var(--fg);line-height:1.1;}}
 .kpi-sub{{font-size:11px;color:var(--muted);margin-top:5px;}}
+.kpi-hero{{background:var(--fg)!important;border-color:var(--fg)!important;}}
+.kpi-hero::before{{height:0;}}
 /* ── CARD ── */
 .card{{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}}
 .card-hdr{{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;}}
@@ -1059,18 +1061,16 @@ tbody tr:hover{{background:var(--bg);}}
 .dlv-num{{font-size:1.4rem;font-weight:800;letter-spacing:-.03em;}}
 .dlv-lbl{{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}}
 /* ── MARKUPS ── */
-.markup-row{{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}}
-.markup-row:last-child{{border-bottom:none;}}
-.markup-left{{display:flex;align-items:center;gap:10px;}}
-.markup-chk{{width:16px;height:16px;accent-color:var(--primary);cursor:pointer;flex-shrink:0;}}
-.markup-name{{font-size:12px;font-weight:600;}}
-.markup-pct{{font-size:11px;color:var(--muted);margin-left:4px;}}
-.markup-right{{text-align:right;}}
-.markup-val{{font-size:13px;font-weight:700;color:var(--muted);transition:color .2s;}}
+.mu-item{{display:flex;align-items:center;gap:7px;padding:7px 0;cursor:pointer;border-bottom:1px solid var(--border);}}
+.mu-item:nth-child(odd):last-child,.mu-item:nth-child(even){{border-bottom:none;}}
+.markup-chk{{width:14px;height:14px;accent-color:var(--primary);cursor:pointer;flex-shrink:0;}}
+.mu-name{{font-size:11px;font-weight:600;flex:1;}}
+.mu-pct{{font-size:10px;color:var(--muted);min-width:28px;}}
+.markup-val{{font-size:11px;font-weight:700;color:var(--muted);transition:color .15s;margin-left:auto;}}
 .markup-val.active{{color:var(--fg);}}
-.grand-total{{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:6px;border-top:3px solid var(--primary);}}
-.grand-total-lbl{{font-size:13px;font-weight:800;letter-spacing:.02em;}}
-.grand-total-val{{font-size:1.5rem;font-weight:800;letter-spacing:-.04em;color:var(--primary-d);}}
+.grand-total{{display:flex;justify-content:space-between;align-items:center;padding-top:10px;margin-top:8px;border-top:2px solid var(--fg);}}
+.grand-total-lbl{{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;}}
+.grand-total-val{{font-size:1.3rem;font-weight:800;letter-spacing:-.04em;color:var(--primary-d);}}
 </style>
 </head>
 <body>
@@ -1101,10 +1101,10 @@ tbody tr:hover{{background:var(--bg);}}
     <div class="kpi-val">{elapsed_h:.1f} h</div>
     <div class="kpi-sub">{elapsed_h/8:.1f} person days</div>
   </div>
-  <div class="kpi" style="--ka:#2563eb">
-    <div class="kpi-lbl">Estimated cost</div>
-    <div class="kpi-val" id="kpi-cost">—</div>
-    <div class="kpi-sub">Internal + Subco + API</div>
+  <div class="kpi kpi-hero">
+    <div class="kpi-lbl" style="color:rgba(255,255,255,.6)">Estimated cost</div>
+    <div class="kpi-val" id="kpi-cost" style="color:#fff">—</div>
+    <div class="kpi-sub" style="color:rgba(255,255,255,.5)">Internal + Subco + API</div>
   </div>
   <div class="kpi" style="--ka:#d97706">
     <div class="kpi-lbl">Total effort</div>
@@ -1155,38 +1155,12 @@ tbody tr:hover{{background:var(--bg);}}
 
 <!-- MARKUPS -->
 <div class="sec">Price markups</div>
-<div class="card" style="margin-bottom:10px;">
-  <div class="card-hdr">
-    <div class="card-title">Optional cost add-ons</div>
-    <div class="card-tag">check to include</div>
-  </div>
-  <div class="markup-row">
-    <div class="markup-left">
-      <input type="checkbox" class="markup-chk" id="chk-pmo" onchange="recomputeMarkup()">
-      <span class="markup-name">PMO</span><span class="markup-pct">2%</span>
-    </div>
-    <div class="markup-right"><div class="markup-val" id="val-pmo">—</div></div>
-  </div>
-  <div class="markup-row">
-    <div class="markup-left">
-      <input type="checkbox" class="markup-chk" id="chk-cap" onchange="recomputeMarkup()">
-      <span class="markup-name">Capital Charges</span><span class="markup-pct">3%</span>
-    </div>
-    <div class="markup-right"><div class="markup-val" id="val-cap">—</div></div>
-  </div>
-  <div class="markup-row">
-    <div class="markup-left">
-      <input type="checkbox" class="markup-chk" id="chk-con" onchange="recomputeMarkup()">
-      <span class="markup-name">Contingency</span><span class="markup-pct">4%</span>
-    </div>
-    <div class="markup-right"><div class="markup-val" id="val-con">—</div></div>
-  </div>
-  <div class="markup-row">
-    <div class="markup-left">
-      <input type="checkbox" class="markup-chk" id="chk-res" onchange="recomputeMarkup()">
-      <span class="markup-name">Reserve (Accantonamento)</span><span class="markup-pct">20%</span>
-    </div>
-    <div class="markup-right"><div class="markup-val" id="val-res">—</div></div>
+<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;box-shadow:var(--shadow);">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">
+    <label class="mu-item"><input type="checkbox" class="markup-chk" id="chk-pmo" onchange="recomputeMarkup()"><span class="mu-name">PMO</span><span class="mu-pct">2%</span><span class="markup-val" id="val-pmo"></span></label>
+    <label class="mu-item"><input type="checkbox" class="markup-chk" id="chk-cap" onchange="recomputeMarkup()"><span class="mu-name">Capital Charges</span><span class="mu-pct">3%</span><span class="markup-val" id="val-cap"></span></label>
+    <label class="mu-item"><input type="checkbox" class="markup-chk" id="chk-con" onchange="recomputeMarkup()"><span class="mu-name">Contingency</span><span class="mu-pct">4%</span><span class="markup-val" id="val-con"></span></label>
+    <label class="mu-item"><input type="checkbox" class="markup-chk" id="chk-res" onchange="recomputeMarkup()"><span class="mu-name">Reserve</span><span class="mu-pct">20%</span><span class="markup-val" id="val-res"></span></label>
   </div>
   <div class="grand-total">
     <div class="grand-total-lbl">TOTAL PRICE</div>
