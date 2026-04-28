@@ -1050,9 +1050,9 @@ tbody tr:last-child td{{border-bottom:none;}}
 tbody tr:hover{{background:var(--bg);}}
 .av{{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:8px;font-weight:800;color:#fff;flex-shrink:0;vertical-align:middle;margin-right:5px;}}
 .pill{{display:inline-flex;align-items:center;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}}
-.pill-i{{background:#f3f4f6;color:#6b7280;}}
-.pill-s{{background:var(--accent);color:var(--accent-fg);}}
-.pill-sub{{background:#fdf2f8;color:#be185d;border:1px solid #fbcfe8;}}
+.pill-i{{background:#2563eb;color:#fff;}}
+.pill-s{{background:#65a30d;color:#fff;}}
+.pill-sub{{background:#ec4899;color:#fff;}}
 .muted{{color:var(--muted);}}
 /* ── DELIVERABLES ── */
 .dlv{{display:flex;gap:12px;margin-bottom:10px;}}
