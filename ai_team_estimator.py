@@ -1592,24 +1592,24 @@ with tab_job:
         active_rows["nome_lavorazione"].fillna("").astype(str).str.strip() != ""
     ].reset_index(drop=True)
 
-    # Units/hr ↔ Units/day toggle
-    rate_mode = st.radio(
-        "Rate mode",
-        options=["Units/hr", "Units/day"],
-        index=st.session_state.get("rate_mode_idx", 0),
-        horizontal=True,
-        label_visibility="collapsed",
-        key="rate_mode_radio",
-    )
-    st.session_state["rate_mode_idx"] = 0 if rate_mode == "Units/hr" else 1
-    use_day_rate = rate_mode == "Units/day"
-
     if not active_rows.empty:
         h1, h2, h3, h4 = st.columns([3.4, 1.7, 1.8, 4.1])
         h1.markdown("`Task`")
         h2.markdown("`Qty`")
-        h3.markdown(f"`{rate_mode}`")
+        rate_mode = h3.radio(
+            "Rate mode",
+            options=["Units/hr", "Units/day"],
+            index=st.session_state.get("rate_mode_idx", 0),
+            horizontal=True,
+            label_visibility="collapsed",
+            key="rate_mode_radio",
+        )
+        st.session_state["rate_mode_idx"] = 0 if rate_mode == "Units/hr" else 1
+        use_day_rate = rate_mode == "Units/day"
         h4.markdown("`Assigned to`")
+    else:
+        rate_mode = "Units/hr"
+        use_day_rate = False
 
         for row_idx, row in active_rows.iterrows():
             current_names = parse_assigned_people(row.get("assegnato_a", ""), nomi_disponibili_job)
