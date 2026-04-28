@@ -88,51 +88,21 @@ def get_current_user_id() -> str | None:
         return None
 
 def load_profiles_db() -> list[dict]:
-    user_id = get_current_user_id()
-    query = get_supabase().table("profiles").select("*").order("id")
-    if user_id:
-        try:
-            rows = query.eq("user_id", user_id).execute()
-            if rows.data:
-                return rows.data
-            # user_id filter returned nothing — fall through to unfiltered query
-        except Exception as exc:
-            if "profiles.user_id does not exist" not in str(exc):
-                raise
-    rows = query.execute()
+    # Profiles are shared team data — no per-user filtering.
+    rows = get_supabase().table("profiles").select("*").order("id").execute()
     return rows.data or []
 
 
 def save_profiles_db(profiles: list[dict]):
     sb = get_supabase()
-    user_id = get_current_user_id()
-    if user_id:
-        try:
-            sb.table("profiles").delete().eq("user_id", user_id).execute()
-        except Exception as exc:
-            if "profiles.user_id does not exist" not in str(exc):
-                raise
-            sb.table("profiles").delete().neq("id", 0).execute()
-    else:
-        sb.table("profiles").delete().neq("id", 0).execute()
+    sb.table("profiles").delete().neq("id", 0).execute()
     if profiles:
         rows = []
         for profile in profiles:
             row = dict(profile)
-            if user_id:
-                row["user_id"] = user_id
+            row.pop("user_id", None)
             rows.append(row)
-        try:
-            sb.table("profiles").insert(rows).execute()
-        except Exception as exc:
-            if "profiles.user_id does not exist" not in str(exc):
-                raise
-            fallback_rows = []
-            for profile in profiles:
-                row = dict(profile)
-                row.pop("user_id", None)
-                fallback_rows.append(row)
-            sb.table("profiles").insert(fallback_rows).execute()
+        sb.table("profiles").insert(rows).execute()
 
 
 # ── PRESETS ───────────────────────────────────────────────────
