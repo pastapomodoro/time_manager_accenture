@@ -1242,8 +1242,15 @@ with tab_job:
         giorni_reali  = ore_reali_tot / ORE_GIORNATA
         giorni_effort = ore_effort_tot / ORE_GIORNATA
         nomi_c = {n for it in job_items for n in it["assigned"]}
-        cap    = df_team[df_team["nome"].isin(nomi_c)]["disponibilita_h_settimana"].sum()
-        giorni_cal = (ore_reali_tot / cap * 5) if cap > 0 else None
+        giorni_per_persona = []
+        for nome in nomi_c:
+            ore_persona = float(ore_pp.get(nome, 0.0))
+            if ore_persona <= 0:
+                continue
+            capacita_giornaliera = ORE_GIORNATA
+            if capacita_giornaliera > 0:
+                giorni_per_persona.append(ore_persona / capacita_giornaliera)
+        giorni_cal = max(giorni_per_persona) if giorni_per_persona else None
 
         phase_df = pd.DataFrame(phase_rows)
         if not phase_df.empty:
@@ -1255,10 +1262,7 @@ with tab_job:
 
         days = business_days(start_date, deadline_value)
         scope_people = nomi_disponibili_job
-        daily_capacity = (
-            df_team[df_team["nome"].isin(scope_people)]["disponibilita_h_settimana"].sum() / 5.0
-            if scope_people else 0.0
-        )
+        daily_capacity = (len(scope_people) * ORE_GIORNATA) if scope_people else 0.0
         required_per_day = (ore_effort_tot / days) if days > 0 else None
 
         st.markdown('<section class="bento-board">', unsafe_allow_html=True)
@@ -1328,10 +1332,7 @@ with tab_job:
                     if gap <= 0:
                         st.success("Con il team selezionato sei dentro deadline (sulla base dell'effort).")
                     else:
-                        avg_person_day = (
-                            df_team[df_team["nome"].isin(scope_people)]["disponibilita_h_settimana"].mean() / 5.0
-                            if scope_people else 0
-                        )
+                        avg_person_day = ORE_GIORNATA if scope_people else 0
                         extra_people = int((gap / (avg_person_day * days)) + 0.999) if avg_person_day > 0 else None
                         st.warning(f"Serve più capacità: mancano ~**{gap:.1f} h** entro deadline.")
                         if extra_people is not None:
