@@ -243,7 +243,7 @@ if _USE_SUPABASE:
         st.stop()
 
 ORE_GIORNATA     = 8.0
-RETRY_MULTIPLIER = 3
+RETRY_MULTIPLIER = 4
 SUBCO_COLOR      = "#EC4899"
 
 _XLSX_ENV = os.environ.get("AI_TEAM_DATA_XLSX", "").strip()
@@ -1108,7 +1108,7 @@ tbody tr:hover{{background:var(--bg);}}
     <div class="cost-right"><div class="cost-val">{html.escape(f"€ {sub_total:,.0f}".replace(",","."))}</div><div class="cost-pct" id="sub-cost-pct"></div></div>
   </div>
   <div class="cost-row">
-    <div class="cost-left"><div class="dot" style="background:#2563eb"></div><span class="cost-name">Production cost (API · ×3 retry)</span><span class="ctag">LCR</span></div>
+    <div class="cost-left"><div class="dot" style="background:#2563eb"></div><span class="cost-name">Production cost (API · ×4 retry)</span><span class="ctag">LCR</span></div>
     <div class="cost-right"><div class="cost-val">{html.escape(f"€ {prod_cost_total:,.0f}".replace(",","."))}</div><div class="cost-pct" id="prod-cost-pct"></div></div>
   </div>
   <div class="cost-total">
