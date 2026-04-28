@@ -305,41 +305,41 @@ html, body, [class*="css"] {
 
 /* ── SIDEBAR ─────────────────────────────────────────────── */
 [data-testid="stSidebar"] {
-  background: var(--fg) !important;
-  border-right: none !important;
+  background: var(--card) !important;
+  border-right: 1px solid var(--border) !important;
 }
-[data-testid="stSidebar"] * { color: #ffffff !important; }
-[data-testid="stSidebar"] hr { border-color: rgba(255,255,255,.12) !important; }
+[data-testid="stSidebar"] * { color: var(--fg) !important; }
+[data-testid="stSidebar"] hr { border-color: var(--border) !important; }
 [data-testid="stSidebar"] h1 {
-  color: var(--primary) !important;
+  color: var(--primary-d) !important;
   font-size: 1rem !important;
   font-weight: 800 !important;
   letter-spacing: .06em !important;
   text-transform: uppercase !important;
 }
 [data-testid="stSidebar"] .stButton > button {
-  background: rgba(255,255,255,.08) !important;
-  color: rgba(255,255,255,.9) !important;
-  border: 1px solid rgba(255,255,255,.14) !important;
+  background: var(--muted) !important;
+  color: var(--fg) !important;
+  border: 1px solid var(--border) !important;
 }
 [data-testid="stSidebar"] .stButton > button:hover {
-  background: rgba(255,255,255,.15) !important;
+  background: var(--accent) !important;
 }
 [data-testid="stSidebar"] [data-testid="stDownloadButton"] button {
-  background: rgba(255,255,255,.08) !important;
-  color: rgba(255,255,255,.9) !important;
-  border: 1px solid rgba(255,255,255,.14) !important;
+  background: var(--muted) !important;
+  color: var(--fg) !important;
+  border: 1px solid var(--border) !important;
 }
 [data-testid="stSidebar"] .stPopover > button {
-  background: rgba(255,255,255,.08) !important;
-  color: rgba(255,255,255,.9) !important;
-  border: 1px solid rgba(255,255,255,.14) !important;
+  background: var(--muted) !important;
+  color: var(--fg) !important;
+  border: 1px solid var(--border) !important;
 }
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
-  color: rgba(255,255,255,.45) !important;
+  color: var(--muted-fg) !important;
 }
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] * {
-  color: rgba(255,255,255,.45) !important;
+  color: var(--muted-fg) !important;
 }
 
 /* ── HEADINGS ────────────────────────────────────────────── */
