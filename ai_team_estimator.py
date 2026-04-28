@@ -79,6 +79,8 @@ if _USE_SUPABASE:
                 if st.form_submit_button("Crea account", use_container_width=True):
                     if not new_email or not new_pwd:
                         st.error("Compila tutti i campi")
+                    elif not new_email.lower().endswith("@accenture.com"):
+                        st.error("La registrazione è riservata agli account @accenture.com")
                     elif new_pwd != new_pwd2:
                         st.error("Le password non coincidono")
                     else:
