@@ -3,11 +3,12 @@ AI_Team Estimator — stima tempi e costi per AI_Team, Accenture Song.
 Run: python3 -m streamlit run ai_team_estimator.py
 """
 
-import os, json
+import os, json, html
 import streamlit as st
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
+from datetime import date as _date
 
 try:
     from db import (is_supabase_configured, sign_in, sign_up, sign_out,
@@ -458,6 +459,128 @@ hr { border-color: var(--border) !important; }
 .sec-hdr svg{flex-shrink:0;}
 .status-label{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted-fg);}
 .status-label svg{flex-shrink:0;}
+
+/* ── RESULTS BENTO DASHBOARD ───────────────────────────────── */
+.bento-board {
+  margin: 4px 0 18px 0;
+}
+.bento-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+@media (max-width: 1100px) {
+  .bento-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.bento-kpi {
+  background: linear-gradient(165deg, color-mix(in srgb, var(--card) 88%, var(--primary) 12%) 0%, var(--card) 55%);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 4px);
+  padding: 14px 16px 16px;
+  min-height: 92px;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 6%, transparent);
+}
+.bento-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-fg);
+  margin: 0 0 6px 0;
+}
+.bento-kpi-value {
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+  line-height: 1.15;
+}
+.bento-kpi-sub {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted-fg);
+  font-weight: 500;
+}
+.bento-row2 {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+@media (max-width: 900px) {
+  .bento-row2 { grid-template-columns: 1fr; }
+}
+.bento-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 16px 18px 18px;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent);
+}
+.bento-card-hdr {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.bento-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--fg);
+  letter-spacing: -0.02em;
+}
+.bento-card-tag {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-fg);
+}
+.bento-phase-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.bento-phase-row:last-child { margin-bottom: 0; }
+.bento-phase-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bento-phase-track {
+  grid-column: 1 / -1;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 35%, var(--card));
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+.bento-phase-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+.bento-phase-val {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-fg);
+  text-align: right;
+}
+.bento-plan-stat {
+  font-size: 13px;
+  color: var(--fg);
+  margin: 0 0 8px 0;
+  line-height: 1.45;
+}
+.bento-plan-stat strong { color: var(--fg); font-weight: 700; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -498,6 +621,53 @@ def compact_avatars_html(names, color_map, max_visible: int = 5) -> str:
     avatars = "".join(avatar_html(n, color_map[n], size=28) for n in visible)
     extra_html = f'<span class="avatar-count">+{extra}</span>' if extra > 0 else ""
     return f'<div class="compact-avatar-row">{avatars}{extra_html}</div>'
+
+
+def fmt_hours(value: float) -> str:
+    return f"{value:.1f} h"
+
+
+def fmt_currency(value: float) -> str:
+    return f"€ {value:,.0f}".replace(",", ".")
+
+
+def bento_kpi_html(label: str, value: str, sub: str = "") -> str:
+    sub_html = f'<div class="bento-kpi-sub">{html.escape(sub)}</div>' if sub else ""
+    return (
+        '<div class="bento-kpi">'
+        f'<div class="bento-kpi-label">{html.escape(label)}</div>'
+        f'<div class="bento-kpi-value">{html.escape(value)}</div>'
+        f"{sub_html}"
+        "</div>"
+    )
+
+
+def phase_bars_html(df: pd.DataFrame, max_rows: int = 8) -> str:
+    if df.empty:
+        return '<p class="bento-plan-stat" style="margin-bottom:0;color:var(--muted-fg)">Nessun dato fase disponibile.</p>'
+
+    clipped = df.head(max_rows)
+    max_effort = float(clipped["ore_effort"].max()) if not clipped.empty else 0.0
+    if max_effort <= 0:
+        max_effort = 1.0
+
+    rows = []
+    for idx, row in clipped.reset_index(drop=True).iterrows():
+        phase_name = str(row.get("fase", "ALTRO") or "ALTRO")
+        effort = float(row.get("ore_effort", 0.0) or 0.0)
+        pct = max(4.0, min(100.0, (effort / max_effort) * 100.0)) if effort > 0 else 0.0
+        color = PALETTE[idx % len(PALETTE)]
+        rows.append(
+            '<div class="bento-phase-row">'
+            f'<div class="bento-phase-name" title="{html.escape(phase_name)}">{html.escape(phase_name)}</div>'
+            f'<div class="bento-phase-val">{effort:.1f}h</div>'
+            '<div class="bento-phase-track">'
+            f'<div class="bento-phase-fill" style="width:{pct:.1f}%;background:{color}"></div>'
+            "</div>"
+            "</div>"
+        )
+
+    return "".join(rows)
 
 
 # ── STORAGE ───────────────────────────────────────────────────
@@ -584,6 +754,13 @@ def preset_to_meta(preset_data: dict) -> dict:
     if not preset_data or "meta" not in preset_data:
         return {}
     return preset_data.get("meta", {}) or {}
+
+
+def business_days(start: _date, end: _date) -> int:
+    """Numero di giorni lavorativi (lun-ven) inclusivi. Ritorna 0 se range invalido."""
+    if not start or not end or end < start:
+        return 0
+    return len(pd.bdate_range(start=start, end=end))
 
 
 def build_editor_rows(df_lav: pd.DataFrame, preset_rows: list[dict]) -> pd.DataFrame:
@@ -699,33 +876,55 @@ def build_export_excel(nome_progetto, job_items, ore_pp, costo_pp,
     return buf.getvalue()
 
 
+def build_template_excel(source_bytes: bytes | None = None) -> bytes:
+    """Restituisce un template Excel scaricabile e riutilizzabile in upload."""
+    if source_bytes:
+        return source_bytes
+
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as w:
+        pd.DataFrame([
+            {
+                "tipologia_id": "CAT-001",
+                "sottocategoria": "GENERAZIONE",
+                "nome_lavorazione": "Generazione immagine AI",
+                "minuti_per_unita": 60,
+                "skill_richiesta": "prompt",
+            }
+        ]).to_excel(w, sheet_name="lavorazioni", index=False)
+
+        pd.DataFrame([
+            {
+                "id": 1,
+                "nome": "Nome Cognome",
+                "ruolo": "Senior Graphic Designer",
+                "seniority": "senior",
+                "costo_orario": 15,
+                "skill_tags": "prompt,retouch",
+                "disponibilita_h_settimana": 40,
+            }
+        ]).to_excel(w, sheet_name="team", index=False)
+
+        pd.DataFrame([
+            {"foglio": "lavorazioni", "note": "Compila le lavorazioni del catalogo. `minuti_per_unita` deve essere numerico."},
+            {"foglio": "team", "note": "Compila il team. `costo_orario` e `disponibilita_h_settimana` devono essere numerici."},
+        ]).to_excel(w, sheet_name="_istruzioni", index=False)
+    return buf.getvalue()
+
+
 # ── SIDEBAR ───────────────────────────────────────────────────
 with st.sidebar:
     st.title("AI Team Estimator")
     st.divider()
 
+    uploaded_bytes = None
     if _USE_SUPABASE:
         file_bytes = load_xlsx_from_storage()
         if file_bytes:
             st.caption("Excel caricato da Supabase Storage")
-            with st.expander("Sostituisci file Excel"):
-                up = st.file_uploader("Nuovo Excel", type=["xlsx"])
-                if up and st.button("Carica su Supabase", use_container_width=True):
-                    upload_xlsx_to_storage(up.getvalue())
-                    st.cache_data.clear()
-                    st.toast("File aggiornato")
-                    st.rerun()
         else:
             st.warning("Nessun Excel nel bucket Supabase.")
-            up = st.file_uploader("Carica ai_team_data.xlsx", type=["xlsx"])
-            if up and st.button("Carica su Supabase", use_container_width=True):
-                upload_xlsx_to_storage(up.getvalue())
-                st.rerun()
-            file_bytes = up.getvalue() if up else None
-        st.divider()
-        if st.button("Esci", use_container_width=True):
-            sign_out()
-            st.rerun()
+            file_bytes = None
     elif os.path.exists(DEFAULT_XLSX):
         with open(DEFAULT_XLSX, "rb") as f:
             file_bytes = f.read()
@@ -733,13 +932,45 @@ with st.sidebar:
             st.caption(f"Excel caricato da: `{DEFAULT_XLSX}`")
         else:
             st.caption("`ai_team_data.xlsx` caricato")
-        with st.expander("Sostituisci file"):
-            up = st.file_uploader("Carica un altro Excel", type=["xlsx"])
-            if up:
-                file_bytes = up.getvalue()
     else:
-        up = st.file_uploader("Carica ai_team_data.xlsx", type=["xlsx"])
-        file_bytes = up.getvalue() if up else None
+        file_bytes = None
+
+    b_left, b_right = st.columns([1, 1], gap="small")
+    with b_left:
+        with st.popover("Sostituisci file Excel", use_container_width=True):
+            up = st.file_uploader(
+                "Carica nuovo Excel",
+                type=["xlsx"],
+                key="sidebar_replace_excel",
+            )
+            if up:
+                uploaded_bytes = up.getvalue()
+                if _USE_SUPABASE:
+                    upload_xlsx_to_storage(uploaded_bytes)
+                    st.cache_data.clear()
+                    st.toast("File aggiornato")
+                    st.rerun()
+                else:
+                    file_bytes = uploaded_bytes
+                    st.toast("File Excel caricato")
+
+    with b_right:
+        template_excel = build_template_excel(
+            file_bytes
+            if file_bytes
+            else (open(DEFAULT_XLSX, "rb").read() if os.path.exists(DEFAULT_XLSX) else None)
+        )
+        st.download_button(
+            "Template Excel",
+            data=template_excel,
+            file_name="ai_team_template.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
+    if not _USE_SUPABASE and uploaded_bytes:
+        file_bytes = uploaded_bytes
+    st.caption("Sostituisci file corrente o scarica il template.")
 
     if not file_bytes:
         st.info("Carica il file Excel per iniziare.")
@@ -764,6 +995,12 @@ with st.sidebar:
             c1.markdown(avatar_html(row["nome"], color_map[row["nome"]]), unsafe_allow_html=True)
             label = row["ruolo"] if has_ruolo else row.get("seniority","")
             c2.caption(f"**{row['nome']}**  \n{label}")
+
+    if _USE_SUPABASE:
+        st.divider()
+        if st.button("Esci", use_container_width=True):
+            sign_out()
+            st.rerun()
 
 
 # ── TABS ──────────────────────────────────────────────────────
@@ -831,44 +1068,30 @@ with tab_job:
         if preset_meta.get("deadline")
         else datetime.now().date()
     )
+    start_default = (
+        pd.to_datetime(preset_meta.get("start_date")).date()
+        if preset_meta.get("start_date")
+        else datetime.now().date()
+    )
+    st.markdown(f'<div class="sec-hdr" style="font-size:1.0rem">{ICO_WRENCH} Impostazioni job</div>', unsafe_allow_html=True)
+    s1, s2, s3 = st.columns([1.1, 1.1, 2.8])
+    with s1:
+        start_date = st.date_input("Data inizio", value=start_default, key="job_start_date")
+    with s2:
+        deadline_value = st.date_input("Deadline", value=deadline_default, key="job_deadline")
+    with s3:
+        team_scope = st.multiselect(
+            "Team sul job",
+            options=tutti_nomi,
+            default=team_scope_default,
+            format_func=lambda n: f"{initials(n)}  {n}",
+            placeholder="Seleziona chi lavorerà sul job…",
+            help="Se non selezioni nessuno, il job usa tutto il team.",
+            key="job_team_scope",
+        )
+        display_team_scope = team_scope or tutti_nomi
+        st.markdown(compact_avatars_html(display_team_scope, color_map), unsafe_allow_html=True)
 
-    summary_a, summary_b, summary_c = st.columns([1.2, 2.2, 0.8])
-    with summary_c:
-        with st.expander("Modifica", expanded=False):
-            deadline_value = st.date_input("Deadline", value=deadline_default)
-            team_scope = st.multiselect(
-                "Chi lavorera sul job",
-                options=tutti_nomi,
-                default=team_scope_default,
-                format_func=lambda n: f"{initials(n)}  {n}",
-                placeholder="Seleziona il team del job...",
-                help="Se non selezioni nessuno, il job usa tutto il team.",
-            )
-    if "deadline_value" not in locals():
-        deadline_value = deadline_default
-    if "team_scope" not in locals():
-        team_scope = team_scope_default
-    display_team_scope = team_scope or tutti_nomi
-    with summary_a:
-        st.markdown(
-            f"""
-            <div class="job-settings-card">
-              <div class="job-settings-label">Deadline</div>
-              <div class="job-settings-value">{deadline_value.strftime('%d/%m/%Y')}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with summary_b:
-        st.markdown(
-            f"""
-            <div class="job-settings-card">
-              <div class="job-settings-label">Team sul job</div>
-              {compact_avatars_html(display_team_scope, color_map)}
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
     nomi_disponibili_job = team_scope or tutti_nomi
 
     st.divider()
@@ -943,7 +1166,7 @@ with tab_job:
             job_items.append({
                 "nome": nome,
                 "uph": uph,
-                "skill": str(row.get("skill_richiesta", "")).strip(),
+                "fase": str(row.get("sottocategoria", "")).strip(),
                 "quantita": qty,
                 "assigned": assigned,
             })
@@ -974,6 +1197,7 @@ with tab_job:
                     })
                 snap = {
                     "meta": {
+                        "start_date": start_date.isoformat(),
                         "deadline": deadline_value.isoformat(),
                         "team_scope": team_scope,
                     },
@@ -987,15 +1211,15 @@ with tab_job:
 
     # Risultati
     st.divider()
-    label = f"Risultati{' — ' + nome_progetto if nome_progetto else ''}"
+    label = f"Stima{' — ' + nome_progetto if nome_progetto else ''}"
     st.markdown(f'<div class="sec-hdr" style="font-size:1.3rem">{ICO_FILE} {label}</div>', unsafe_allow_html=True)
-    st.caption(f"Deadline: {deadline_value.strftime('%d/%m/%Y')} • Team selezionato: {len(nomi_disponibili_job)} persone")
 
     if not job_items:
         st.info("Inserisci almeno una quantità e assegna una persona per vedere la stima.")
     else:
         ore_base_tot = ore_effort_tot = ore_reali_tot = costo_totale = 0.0
         ore_pp: dict[str,float] = {}; costo_pp: dict[str,float] = {}
+        phase_rows = []
 
         for it in job_items:
             ob = it["quantita"] / it["uph"]
@@ -1007,6 +1231,8 @@ with tab_job:
                 ore_pp[nome]   = ore_pp.get(nome,0)   + or_
                 costo_pp[nome] = costo_pp.get(nome,0) + or_ * t
                 costo_totale  += or_ * t
+            phase = str(it.get("fase") or "").strip() or "ALTRO"
+            phase_rows.append({"fase": phase, "ore_effort": ob, "ore_reali": or_})
 
         giorni_reali  = ore_reali_tot / ORE_GIORNATA
         giorni_effort = ore_effort_tot / ORE_GIORNATA
@@ -1014,13 +1240,100 @@ with tab_job:
         cap    = df_team[df_team["nome"].isin(nomi_c)]["disponibilita_h_settimana"].sum()
         giorni_cal = (ore_reali_tot / cap * 5) if cap > 0 else None
 
-        m1,m2,m3,m4 = st.columns(4)
-        m1.metric("Tempo reale", f"{ore_reali_tot:.1f} h")
-        m2.metric("Giorni reali", f"{giorni_reali:.1f}")
-        m3.metric("Costo stimato", f"€ {costo_totale:,.0f}")
-        if giorni_cal:
-            m4.metric("Durata calendario", f"{giorni_cal:.0f} giorni lav.")
-        st.caption(f"Effort totale: {ore_effort_tot:.1f} h ({giorni_effort:.1f} gg)")
+        phase_df = pd.DataFrame(phase_rows)
+        if not phase_df.empty:
+            phase_df = (
+                phase_df.groupby("fase", as_index=False)[["ore_effort", "ore_reali"]]
+                .sum()
+                .sort_values("ore_effort", ascending=False)
+            )
+
+        days = business_days(start_date, deadline_value)
+        scope_people = nomi_disponibili_job
+        daily_capacity = (
+            df_team[df_team["nome"].isin(scope_people)]["disponibilita_h_settimana"].sum() / 5.0
+            if scope_people else 0.0
+        )
+        required_per_day = (ore_effort_tot / days) if days > 0 else None
+
+        st.markdown('<section class="bento-board">', unsafe_allow_html=True)
+        st.markdown(
+            (
+                '<div class="bento-kpis">'
+                f'{bento_kpi_html("Tempo reale", fmt_hours(ore_reali_tot), f"{giorni_reali:.1f} gg persone")}'
+                f'{bento_kpi_html("Costo stimato", fmt_currency(costo_totale), "Basato su costo orario del team")}'
+                f'{bento_kpi_html("Effort totale", fmt_hours(ore_effort_tot), f"{giorni_effort:.1f} gg effort")}'
+                f'{bento_kpi_html("Durata calendario", f"{giorni_cal:.0f} gg lav." if giorni_cal else "—", "Con assegnazioni attuali")}'
+                '</div>'
+            ),
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="bento-row2">', unsafe_allow_html=True)
+
+        c_left, c_right = st.columns([1.55, 1.0])
+        with c_left:
+            phase_meta = f"{len(phase_df)} fasi" if not phase_df.empty else "Nessuna fase"
+            st.markdown(
+                (
+                    '<div class="bento-card">'
+                    '<div class="bento-card-hdr">'
+                    '<div class="bento-card-title">Distribuzione effort per fase</div>'
+                    f'<div class="bento-card-tag">{html.escape(phase_meta)}</div>'
+                    '</div>'
+                    f'{phase_bars_html(phase_df)}'
+                    '</div>'
+                ),
+                unsafe_allow_html=True,
+            )
+
+        with c_right:
+            st.markdown(
+                (
+                    '<div class="bento-card">'
+                    '<div class="bento-card-hdr">'
+                    '<div class="bento-card-title">Piano entro deadline</div>'
+                    '<div class="bento-card-tag">Capacity check</div>'
+                    '</div>'
+                ),
+                unsafe_allow_html=True,
+            )
+            if days <= 0:
+                st.markdown(
+                    '<p class="bento-plan-stat">Imposta una <strong>data inizio</strong> e una <strong>deadline</strong> valide.</p>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    (
+                        f'<p class="bento-plan-stat">Finestra: <strong>{days} gg lavorativi</strong></p>'
+                        f'<p class="bento-plan-stat">Capacità team: <strong>{daily_capacity:.1f} h/giorno</strong></p>'
+                        f'<p class="bento-plan-stat">Effort richiesto: <strong>{required_per_day:.1f} h/giorno</strong></p>'
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            if st.button("Calcola piano", use_container_width=True):
+                if daily_capacity <= 0:
+                    st.warning("Capacità team nulla. Controlla disponibilità/Team sul job.")
+                elif days <= 0:
+                    st.warning("La finestra temporale non è valida.")
+                else:
+                    gap = ore_effort_tot - (daily_capacity * days)
+                    if gap <= 0:
+                        st.success("Con il team selezionato sei dentro deadline (sulla base dell'effort).")
+                    else:
+                        avg_person_day = (
+                            df_team[df_team["nome"].isin(scope_people)]["disponibilita_h_settimana"].mean() / 5.0
+                            if scope_people else 0
+                        )
+                        extra_people = int((gap / (avg_person_day * days)) + 0.999) if avg_person_day > 0 else None
+                        st.warning(f"Serve più capacità: mancano ~**{gap:.1f} h** entro deadline.")
+                        if extra_people is not None:
+                            st.caption(f"Stima: aggiungi ~**{extra_people}** persone (con capacità media) oppure aumenta disponibilità.")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('</div></section>', unsafe_allow_html=True)
 
         with st.expander("Dettaglio per persona"):
             st.dataframe(pd.DataFrame([{
