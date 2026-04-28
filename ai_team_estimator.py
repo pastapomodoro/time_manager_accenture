@@ -150,6 +150,11 @@ if _USE_SUPABASE:
         div[data-testid="stForm"] [data-testid="stTextInputRootElement"] label {
           display: none !important;
         }
+        /* Hide Streamlit enter-to-submit helper text that overlaps placeholders */
+        div[data-testid="stForm"] [data-testid="InputInstructions"],
+        div[data-testid="stForm"] [data-testid="stInputInstructions"] {
+          display: none !important;
+        }
 
         /* card title */
         div[data-testid="stForm"] strong { color: oklch(0.2077 0.0398 265.7549) !important; font-size: 1.05rem !important; }
