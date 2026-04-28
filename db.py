@@ -65,8 +65,13 @@ def delete_preset_db(nome: str):
 
 def load_xlsx_from_storage() -> bytes | None:
     try:
-        res = get_supabase().storage.from_(BUCKET).download(XLSX_PATH)
-        return res
+        import httpx
+        url = st.secrets["SUPABASE_URL"]
+        pub_url = f"{url}/storage/v1/object/public/{BUCKET}/{XLSX_PATH}"
+        r = httpx.get(pub_url, timeout=10)
+        if r.status_code == 200:
+            return r.content
+        return None
     except Exception:
         return None
 
