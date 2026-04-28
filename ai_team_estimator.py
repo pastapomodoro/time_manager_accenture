@@ -394,16 +394,11 @@ h1,h2,h3,h4 { color: var(--fg) !important; font-family: Inter, sans-serif !impor
   box-shadow: var(--shadow) !important;
 }
 [data-baseweb="tag"] {
-  background: #dcfce7 !important;
-  color: #166534 !important;
+  background: var(--primary) !important;
+  color: var(--fg) !important;
   border-radius: 999px !important;
-  font-weight: 600 !important;
+  font-weight: 700 !important;
 }
-[data-baseweb="tag"].tag-sub {
-  background: #fce7f3 !important;
-  color: #9d174d !important;
-}
-[data-baseweb="tag"].tag-sub svg { color: #9d174d !important; }
 
 /* ── RADIO (job type selector) ────────────────────────────── */
 [data-testid="stRadio"] > label {
@@ -491,20 +486,6 @@ hr { border-color: var(--border) !important; }
 .status-label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted-fg); }
 .status-label svg { flex-shrink: 0; }
 </style>
-<script>
-setInterval(function(){
-  document.querySelectorAll('[data-baseweb="tag"]').forEach(function(tag){
-    var txt = tag.innerText || '';
-    if(txt.includes('(SUB)')){
-      tag.style.setProperty('background','#fce7f3','important');
-      tag.style.setProperty('color','#9d174d','important');
-    } else {
-      tag.style.setProperty('background','#dcfce7','important');
-      tag.style.setProperty('color','#166534','important');
-    }
-  });
-}, 300);
-</script>
 """, unsafe_allow_html=True)
 
 # Lucide SVG snippets (16×16, stroke only)
