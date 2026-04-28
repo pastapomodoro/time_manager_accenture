@@ -142,7 +142,8 @@ def load_presets_db() -> dict:
 
 def save_preset_db(nome: str, data: dict):
     sb = get_supabase()
-    sb.table("presets").upsert({"nome": nome, "data": data}, on_conflict="nome").execute()
+    sb.table("presets").delete().eq("nome", nome).execute()
+    sb.table("presets").insert({"nome": nome, "data": data}).execute()
 
 
 def delete_preset_db(nome: str):
