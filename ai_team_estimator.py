@@ -267,42 +267,80 @@ SKILL_OPTIONS     = ["retouch","compositing","lighting","prompt","video","editin
 
 st.markdown("""
 <style>
-/* ── THEME TOKENS ─────────────────────────────────────────── */
+/* ── TOKENS (aligned with dashboard) ─────────────────────── */
 :root {
-  --bg:          oklch(0.9892 0.0054 117.9205);
-  --fg:          oklch(0.2077 0.0398 265.7549);
-  --card:        oklch(1.0000 0 0);
-  --primary:     oklch(0.8871 0.2122 128.5041);
-  --primary-fg:  oklch(0 0 0);
-  --secondary:   oklch(0.3717 0.0392 257.2870);
-  --secondary-fg:oklch(0.9842 0.0034 247.8575);
-  --muted:       oklch(0.9683 0.0069 247.8956);
-  --muted-fg:    oklch(0.5544 0.0407 257.4166);
-  --accent:      oklch(0.9819 0.0181 155.8263);
-  --accent-fg:   oklch(0.4479 0.1083 151.3277);
-  --border:      oklch(0.9288 0.0126 255.5078);
-  --destructive: oklch(0.6368 0.2078 25.3313);
-  --primary-hover: oklch(0.82 0.20 128.5);
-  --focus-ring: oklch(0.8871 0.2122 128.5041 / 0.25);
-  --success:     oklch(0.723 0.192 149.579);
-  --empty:       oklch(0.74 0.02 250);
-  --radius:      1rem;
+  --bg:          #f6faf3;
+  --fg:          #1a2e05;
+  --card:        #ffffff;
+  --primary:     #84cc16;
+  --primary-d:   #65a30d;
+  --primary-fg:  #000000;
+  --primary-hover:#78b614;
+  --muted:       #f0f4ed;
+  --muted-fg:    #6b7a62;
+  --accent:      #ecfccb;
+  --accent-fg:   #3f6212;
+  --border:      #e5eae2;
+  --focus-ring:  #84cc1640;
+  --success:     #22c55e;
+  --empty:       #94a3b8;
+  --radius:      10px;
+  --shadow:      0 1px 3px rgba(0,0,0,.07), 0 1px 1px rgba(0,0,0,.04);
+  --shadow-md:   0 4px 16px rgba(0,0,0,.08);
 }
 
 /* ── GLOBAL ───────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 html, body, [class*="css"] {
   font-family: Inter, system-ui, sans-serif !important;
   letter-spacing: -0.01em;
 }
 .stApp { background: var(--bg) !important; color: var(--fg) !important; }
 
+/* ── TOPBAR brand strip ───────────────────────────────────── */
+[data-testid="stHeader"] {
+  background: var(--fg) !important;
+  border-bottom: none !important;
+}
+
 /* ── SIDEBAR ─────────────────────────────────────────────── */
 [data-testid="stSidebar"] {
-  background: var(--card) !important;
-  border-right: 1px solid var(--border) !important;
+  background: var(--fg) !important;
+  border-right: none !important;
 }
-[data-testid="stSidebar"] * { color: var(--fg) !important; }
+[data-testid="stSidebar"] * { color: #ffffff !important; }
+[data-testid="stSidebar"] hr { border-color: rgba(255,255,255,.12) !important; }
+[data-testid="stSidebar"] h1 {
+  color: var(--primary) !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
+  letter-spacing: .06em !important;
+  text-transform: uppercase !important;
+}
+[data-testid="stSidebar"] .stButton > button {
+  background: rgba(255,255,255,.08) !important;
+  color: rgba(255,255,255,.9) !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+}
+[data-testid="stSidebar"] .stButton > button:hover {
+  background: rgba(255,255,255,.15) !important;
+}
+[data-testid="stSidebar"] [data-testid="stDownloadButton"] button {
+  background: rgba(255,255,255,.08) !important;
+  color: rgba(255,255,255,.9) !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+}
+[data-testid="stSidebar"] .stPopover > button {
+  background: rgba(255,255,255,.08) !important;
+  color: rgba(255,255,255,.9) !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+  color: rgba(255,255,255,.45) !important;
+}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] * {
+  color: rgba(255,255,255,.45) !important;
+}
 
 /* ── HEADINGS ────────────────────────────────────────────── */
 h1,h2,h3,h4 { color: var(--fg) !important; font-family: Inter, sans-serif !important; }
@@ -314,11 +352,14 @@ h1,h2,h3,h4 { color: var(--fg) !important; font-family: Inter, sans-serif !impor
   border: 1px solid var(--border) !important;
   border-radius: var(--radius) !important;
   font-family: Inter, sans-serif !important;
-  font-weight: 500 !important;
-  transition: background 0.15s;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  transition: background .15s, box-shadow .15s;
+  box-shadow: var(--shadow) !important;
 }
 .stButton > button:hover, .stDownloadButton > button:hover {
   background: var(--border) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 .stButton > button[kind="primary"] {
   background: var(--primary) !important;
@@ -333,68 +374,77 @@ h1,h2,h3,h4 { color: var(--fg) !important; font-family: Inter, sans-serif !impor
 .stTextInput input, .stNumberInput input {
   background: var(--card) !important;
   border: 1px solid var(--border) !important;
-  border-radius: calc(var(--radius) - 4px) !important;
+  border-radius: var(--radius) !important;
   color: var(--fg) !important;
   font-family: Inter, sans-serif !important;
+  box-shadow: var(--shadow) !important;
 }
-.stNumberInput button {
-  display: none !important;
-}
+.stNumberInput button { display: none !important; }
 .stNumberInput input[type="number"]::-webkit-outer-spin-button,
-.stNumberInput input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-.stNumberInput input[type="number"] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
+.stNumberInput input[type="number"]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.stNumberInput input[type="number"] { -moz-appearance:textfield; appearance:textfield; }
 .stTextInput input:focus, .stNumberInput input:focus {
   border-color: var(--primary) !important;
-  box-shadow: 0 0 0 2px var(--focus-ring) !important;
+  box-shadow: 0 0 0 3px var(--focus-ring) !important;
 }
 [data-baseweb="select"] > div {
   background: var(--card) !important;
   border: 1px solid var(--border) !important;
-  border-radius: calc(var(--radius) - 4px) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
 }
 [data-baseweb="tag"] {
   background: var(--accent) !important;
   color: var(--accent-fg) !important;
   border-radius: 999px !important;
+  font-weight: 600 !important;
 }
 
-/* ── METRICS ─────────────────────────────────────────────── */
-[data-testid="stMetric"] {
-  background: var(--card) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius) !important;
-  padding: 16px 20px !important;
-  box-shadow: 0px 8px 20px 0px hsl(0 0% 0% / 0.05) !important;
+/* ── RADIO (job type selector) ────────────────────────────── */
+[data-testid="stRadio"] > label {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .06em !important;
+  color: var(--muted-fg) !important;
 }
-[data-testid="stMetricValue"] { color: var(--fg) !important; font-weight: 700 !important; }
-[data-testid="stMetricLabel"] { color: var(--muted-fg) !important; }
+[data-testid="stRadio"] [data-testid="stMarkdownContainer"] p {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
 
 /* ── EXPANDER ────────────────────────────────────────────── */
 [data-testid="stExpander"] {
   background: var(--card) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
 }
 
 /* ── TABS ────────────────────────────────────────────────── */
+[data-testid="stTabs"] {
+  border-bottom: 1px solid var(--border) !important;
+}
+[data-testid="stTabs"] [role="tablist"] {
+  gap: 4px !important;
+}
 [data-testid="stTabs"] [role="tab"] {
   font-family: Inter, sans-serif !important;
-  font-weight: 500 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
   color: var(--muted-fg) !important;
+  border-radius: var(--radius) var(--radius) 0 0 !important;
+  padding: 8px 16px !important;
 }
 [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
   color: var(--fg) !important;
   border-bottom-color: var(--primary) !important;
+  border-bottom-width: 2px !important;
+  background: var(--card) !important;
 }
 
 /* ── DATAFRAME ───────────────────────────────────────────── */
-[data-testid="stDataFrame"] iframe { border-radius: calc(var(--radius) - 2px) !important; }
+[data-testid="stDataFrame"] iframe { border-radius: var(--radius) !important; }
 
 /* ── DIVIDER ─────────────────────────────────────────────── */
 hr { border-color: var(--border) !important; }
@@ -403,222 +453,38 @@ hr { border-color: var(--border) !important; }
 [data-testid="stAlert"] {
   border-radius: var(--radius) !important;
   border-left-color: var(--primary) !important;
+  box-shadow: var(--shadow) !important;
 }
 
-/* ── APP COMPONENTS ──────────────────────────────────────── */
+/* ── SECTION HEADER ──────────────────────────────────────── */
+.sec-hdr {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted-fg);
+  margin: 20px 0 8px 0;
+}
+.sec-hdr svg { flex-shrink: 0; }
+
+/* ── AVATAR ──────────────────────────────────────────────── */
 .avatar {
-  display:inline-flex;align-items:center;justify-content:center;
-  width:32px;height:32px;border-radius:50%;
-  color:white;font-size:11px;font-weight:700;margin-right:4px;flex-shrink:0;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 50%;
+  color: white; font-size: 11px; font-weight: 700; margin-right: 4px; flex-shrink: 0;
 }
-.avatar-row{display:flex;flex-wrap:wrap;align-items:center;gap:2px;margin-top:2px;}
-.task-name {font-weight:600;font-size:15px;line-height:1.3;color:var(--fg);}
-.group-hdr {
-  font-size:11px;font-weight:700;text-transform:uppercase;
-  letter-spacing:.08em;color:var(--muted-fg);margin:20px 0 4px 0;
+.avatar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-top: 2px; }
+.compact-avatar-row {
+  display: flex; align-items: center; gap: 0; min-height: 32px;
 }
-.profile-card{
-  background:var(--card);border:1px solid var(--border);
-  border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;
+.compact-avatar-row .avatar {
+  margin-right: -8px; border: 2px solid var(--card);
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
 }
-.job-settings-card{
-  background: linear-gradient(180deg, color-mix(in srgb, var(--card) 92%, var(--accent) 8%) 0%, var(--card) 100%);
-  border:1px solid var(--border);
-  border-radius:calc(var(--radius) - 2px);
-  padding:12px 14px;
-  margin:8px 0 10px 0;
-}
-.job-settings-label{
-  font-size:11px;
-  text-transform:uppercase;
-  letter-spacing:.08em;
-  color:var(--muted-fg);
-  font-weight:700;
-  margin-bottom:4px;
-}
-.job-settings-value{
-  font-size:14px;
-  color:var(--fg);
-  font-weight:600;
-}
-.job-settings-subtle{
-  font-size:12px;
-  color:var(--muted-fg);
-}
-.compact-avatar-row{
-  display:flex;
-  align-items:center;
-  gap:0;
-  min-height:32px;
-}
-.compact-avatar-row .avatar{
-  margin-right:-8px;
-  border:2px solid var(--card);
-  box-shadow:0 1px 2px hsl(0 0% 0% / 0.06);
-}
-.avatar-count{
-  margin-left:12px;
-  font-size:12px;
-  color:var(--muted-fg);
-  font-weight:600;
-}
-.sec-hdr{
-  display:flex;align-items:center;gap:8px;font-size:1.1rem;
-  font-weight:700;margin:12px 0 4px 0;color:var(--fg);
-}
-.sec-hdr svg{flex-shrink:0;}
-.status-label{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted-fg);}
-.status-label svg{flex-shrink:0;}
+.avatar-count { margin-left: 12px; font-size: 12px; color: var(--muted-fg); font-weight: 600; }
+.job-settings-subtle { font-size: 12px; color: var(--muted-fg); }
 
-/* ── RESULTS BENTO DASHBOARD ───────────────────────────────── */
-.bento-board {
-  margin: 4px 0 18px 0;
-}
-.bento-kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
-}
-@media (max-width: 1100px) {
-  .bento-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-.bento-kpi {
-  background: linear-gradient(165deg, color-mix(in srgb, var(--card) 88%, var(--primary) 12%) 0%, var(--card) 55%);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 4px);
-  padding: 14px 16px 16px;
-  min-height: 92px;
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 6%, transparent);
-}
-.bento-kpi-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted-fg);
-  margin: 0 0 6px 0;
-}
-.bento-kpi-value {
-  font-size: 1.65rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: var(--fg);
-  line-height: 1.15;
-}
-.bento-kpi-sub {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--muted-fg);
-  font-weight: 500;
-}
-.bento-row2 {
-  display: grid;
-  grid-template-columns: 1.55fr 1fr;
-  gap: 12px;
-  align-items: stretch;
-}
-@media (max-width: 900px) {
-  .bento-row2 { grid-template-columns: 1fr; }
-}
-.bento-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 2px);
-  padding: 16px 18px 18px;
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent);
-}
-.bento-card-hdr {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.bento-card-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--fg);
-  letter-spacing: -0.02em;
-}
-.bento-card-tag {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted-fg);
-}
-.bento-phase-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 52px;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.bento-phase-row:last-child { margin-bottom: 0; }
-.bento-phase-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--fg);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.bento-phase-track {
-  grid-column: 1 / -1;
-  height: 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--muted) 35%, var(--card));
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-}
-.bento-phase-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.35s ease;
-}
-.bento-phase-val {
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted-fg);
-  text-align: right;
-}
-.bento-plan-stat {
-  font-size: 13px;
-  color: var(--fg);
-  margin: 0 0 8px 0;
-  line-height: 1.45;
-}
-.bento-plan-stat strong { color: var(--fg); font-weight: 700; }
-
-/* ── COST BREAKDOWN ──────────────────────────────────────── */
-.cost-breakdown {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 2px);
-  padding: 14px 16px;
-  margin-top: 12px;
-}
-.cost-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 5px 0;
-  font-size: 13px;
-  color: var(--fg);
-}
-.cost-row-label { color: var(--muted-fg); font-size: 12px; }
-.cost-row-tag {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .05em; padding: 2px 7px; border-radius: 999px;
-  background: var(--accent); color: var(--accent-fg); margin-left: 6px;
-}
-.cost-divider { border-top: 1px solid var(--border); margin: 6px 0; }
-.cost-total {
-  display: flex; justify-content: space-between; align-items: center;
-  padding-top: 8px; font-size: 15px; font-weight: 700; color: var(--fg);
-}
+/* ── STATUS LABEL ────────────────────────────────────────── */
+.status-label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted-fg); }
+.status-label svg { flex-shrink: 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1024,19 +890,33 @@ def build_results_html(
     PAL_JS  = json.dumps(["#7C3AED","#2563EB","#059669","#D97706","#DC2626","#0891B2","#65A30D","#C026D3","#EA580C","#0F766E"])
     PINK_JS = "#EC4899"
 
-    rate_label = "LCR" if chargeable else "UCR (BD)"
-    int_total  = sum(costo_pp_internal.values())
-    sub_total  = sum(costo_pp_subco.values())
-    effort_h   = sum(it["quantita"] / it["uph"] for it in job_items)
-    elapsed_h  = sum(ore_pp.values())
-    cal_days   = math.ceil(giorni_cal) if giorni_cal else 0
+    # Pre-compute LCR totals (always needed for the toggle)
+    int_total_lcr = sum(costo_pp_internal.values())
+    sub_total     = sum(costo_pp_subco.values())
+    effort_h      = sum(it["quantita"] / it["uph"] for it in job_items)
+    elapsed_h     = sum(ore_pp.values())
+    cal_days      = math.ceil(giorni_cal) if giorni_cal else 0
+    total_qty_assets = sum(it["quantita"] for it in job_items) or 1
 
-    # Build data arrays for JS
+    # Build per-person rates for both LCR and UCR so JS can toggle
+    rates_lcr: dict[str, float] = {}
+    rates_ucr: dict[str, float] = {}
+    if not df_team.empty:
+        for _, r in df_team.iterrows():
+            n = r["nome"]
+            rates_lcr[n] = float(r.get("costo_lcr", 0))
+            rates_ucr[n] = float(r.get("costo_ucr", 0))
+
+    # Compute UCR internal cost per person (subco & prod costs stay LCR)
+    cost_int_ucr = {n: round(ore_pp.get(n, 0) * rates_ucr.get(n, 0), 2) for n in ore_pp if n in rates_ucr}
+    int_total_ucr = sum(cost_int_ucr.values())
+
     team_js = json.dumps([{
         "name": r["nome"],
         "role": str(r.get("ruolo","")).strip(),
         "type": "intern" if str(r.get("ruolo","")).strip() == "Intern" else "internal",
-        "rate": float(r.get("costo_lcr" if chargeable else "costo_ucr", 0)),
+        "lcr": float(r.get("costo_lcr", 0)),
+        "ucr": float(r.get("costo_ucr", 0)),
     } for _, r in df_team.iterrows()] if not df_team.empty else [])
 
     subco_js = json.dumps([{
@@ -1051,7 +931,6 @@ def build_results_html(
     for it in job_items:
         fase = str(it.get("fase","")).strip() or "OTHER"
         base_h = it["quantita"] / it["uph"]
-        real_h = base_h / max(len(it["assigned"]),1)
         prod_c = it.get("prod_cost",0.0)
         phase_map[fase] = phase_map.get(fase,0) + base_h
         task_rows_js.append({
@@ -1059,18 +938,20 @@ def build_results_html(
             "qty": it["quantita"], "uph": it["uph"],
             "assigned": it["assigned"],
             "base_h": round(base_h,2),
-            "real_h": round(real_h * len(it["assigned"]),2),
+            "real_h": round(base_h,2),
             "prod_c": round(prod_c,2),
         })
-    phases_js   = json.dumps(phase_map)
-    tasks_js    = json.dumps(task_rows_js)
-    ore_pp_js   = json.dumps({k: round(v,2) for k,v in ore_pp.items()})
-    cost_int_js = json.dumps({k: round(v,2) for k,v in costo_pp_internal.items()})
-    cost_sub_js = json.dumps({k: round(v,2) for k,v in costo_pp_subco.items()})
+    phases_js       = json.dumps(phase_map)
+    tasks_js        = json.dumps(task_rows_js)
+    ore_pp_js       = json.dumps({k: round(v,2) for k,v in ore_pp.items()})
+    cost_int_lcr_js = json.dumps({k: round(v,2) for k,v in costo_pp_internal.items()})
+    cost_int_ucr_js = json.dumps({k: round(v,2) for k,v in cost_int_ucr.items()})
+    cost_sub_js     = json.dumps({k: round(v,2) for k,v in costo_pp_subco.items()})
 
-    title    = html.escape(nome_progetto or "Estimate")
-    start_s  = start_date.strftime("%d %b %Y")  if start_date  else ""
-    dead_s   = deadline_value.strftime("%d %b %Y") if deadline_value else ""
+    title   = html.escape(nome_progetto or "Estimate")
+    start_s = start_date.strftime("%d %b %Y")     if start_date     else ""
+    dead_s  = deadline_value.strftime("%d %b %Y") if deadline_value else ""
+    init_lcr_js = "true" if chargeable else "false"
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -1094,16 +975,31 @@ body{{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--fg
 .badge{{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}}
 .badge-rate{{background:var(--primary);color:var(--fg);}}
 .badge-dates{{background:rgba(255,255,255,.12);color:rgba(255,255,255,.8);}}
+/* toggle */
+.toggle-wrap{{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border-radius:999px;padding:3px;}}
+.toggle-btn{{padding:4px 12px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;border:none;background:transparent;color:rgba(255,255,255,.6);transition:all .15s;}}
+.toggle-btn.active{{background:var(--primary);color:var(--fg);}}
+/* pdf button */
+.pdf-btn{{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.8);transition:all .15s;}}
+.pdf-btn:hover{{background:rgba(255,255,255,.15);}}
+@media print{{
+  .hdr .pdf-btn,.toggle-wrap{{display:none!important;}}
+  body{{background:#fff;}}
+  .kpi,.card{{box-shadow:none!important;border:1px solid #ddd!important;}}
+  .charts{{grid-template-columns:1fr 1fr!important;}}
+  .bottom{{grid-template-columns:1fr!important;}}
+}}
 /* ── LAYOUT ── */
 .wrap{{max-width:1200px;margin:0 auto;padding:16px 16px 0;}}
 .sec{{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:20px 0 8px;}}
 /* ── KPIs ── */
-.kpis{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}}
-@media(max-width:800px){{.kpis{{grid-template-columns:repeat(2,1fr);}}}}
+.kpis{{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px;}}
+@media(max-width:900px){{.kpis{{grid-template-columns:repeat(3,1fr);}}}}
+@media(max-width:600px){{.kpis{{grid-template-columns:repeat(2,1fr);}}}}
 .kpi{{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px 16px;position:relative;overflow:hidden;box-shadow:var(--shadow);}}
 .kpi::before{{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--ka,var(--primary));border-radius:var(--radius) var(--radius) 0 0;}}
 .kpi-lbl{{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}}
-.kpi-val{{font-size:1.7rem;font-weight:800;letter-spacing:-.04em;color:var(--fg);line-height:1.1;}}
+.kpi-val{{font-size:1.5rem;font-weight:800;letter-spacing:-.04em;color:var(--fg);line-height:1.1;}}
 .kpi-sub{{font-size:11px;color:var(--muted);margin-top:5px;}}
 /* ── CARD ── */
 .card{{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}}
@@ -1155,8 +1051,12 @@ tbody tr:hover{{background:var(--bg);}}
     <div class="hdr-sub">{start_s} → {dead_s} · {working_days} working days</div>
   </div>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-    <span class="badge badge-rate">{rate_label}</span>
+    <div class="toggle-wrap">
+      <button class="toggle-btn" id="btn-lcr" onclick="setMode(true)">Chargeable (LCR)</button>
+      <button class="toggle-btn" id="btn-ucr" onclick="setMode(false)">BD / Internal (UCR)</button>
+    </div>
     <span class="badge badge-dates">{start_s} → {dead_s}</span>
+    <button class="pdf-btn" onclick="window.print()">⬇ PDF</button>
   </div>
 </div>
 
@@ -1171,8 +1071,8 @@ tbody tr:hover{{background:var(--bg);}}
     <div class="kpi-sub">{elapsed_h/8:.1f} person days</div>
   </div>
   <div class="kpi" style="--ka:#2563eb">
-    <div class="kpi-lbl">Estimated cost [{rate_label}]</div>
-    <div class="kpi-val">{html.escape(f"€ {costo_totale:,.0f}".replace(",","."))}</div>
+    <div class="kpi-lbl">Estimated cost</div>
+    <div class="kpi-val" id="kpi-cost">—</div>
     <div class="kpi-sub">Internal + Subco + API</div>
   </div>
   <div class="kpi" style="--ka:#d97706">
@@ -1185,6 +1085,11 @@ tbody tr:hover{{background:var(--bg);}}
     <div class="kpi-val">{f"{cal_days} days" if cal_days else "—"}</div>
     <div class="kpi-sub">based on assignments</div>
   </div>
+  <div class="kpi" style="--ka:#0891b2">
+    <div class="kpi-lbl">Cost per asset</div>
+    <div class="kpi-val" id="kpi-per-asset">—</div>
+    <div class="kpi-sub">{total_qty_assets} total assets</div>
+  </div>
 </div>
 
 <!-- COST BREAKDOWN -->
@@ -1192,23 +1097,23 @@ tbody tr:hover{{background:var(--bg);}}
 <div class="card" style="margin-bottom:10px;">
   <div class="card-hdr">
     <div class="card-title">Job cost detail</div>
-    <div class="card-tag">{rate_label}</div>
+    <div class="card-tag" id="rate-tag">—</div>
   </div>
   <div class="cost-row">
-    <div class="cost-left"><div class="dot" style="background:#65a30d"></div><span class="cost-name">Internal team cost</span><span class="ctag">{rate_label}</span></div>
-    <div class="cost-right"><div class="cost-val">{html.escape(f"€ {int_total:,.0f}".replace(",","."))}</div><div class="cost-pct">{int(int_total/costo_totale*100) if costo_totale else 0}%</div></div>
+    <div class="cost-left"><div class="dot" style="background:#65a30d"></div><span class="cost-name">Internal team cost</span><span class="ctag" id="int-rate-tag">—</span></div>
+    <div class="cost-right"><div class="cost-val" id="int-cost-val">—</div><div class="cost-pct" id="int-cost-pct"></div></div>
   </div>
   <div class="cost-row">
     <div class="cost-left"><div class="dot" style="background:#ec4899"></div><span class="cost-name">Subcontractor cost</span><span class="ctag">LCR</span></div>
-    <div class="cost-right"><div class="cost-val">{html.escape(f"€ {sub_total:,.0f}".replace(",","."))}</div><div class="cost-pct">{int(sub_total/costo_totale*100) if costo_totale else 0}%</div></div>
+    <div class="cost-right"><div class="cost-val">{html.escape(f"€ {sub_total:,.0f}".replace(",","."))}</div><div class="cost-pct" id="sub-cost-pct"></div></div>
   </div>
   <div class="cost-row">
     <div class="cost-left"><div class="dot" style="background:#2563eb"></div><span class="cost-name">Production cost (API · ×3 retry)</span><span class="ctag">LCR</span></div>
-    <div class="cost-right"><div class="cost-val">{html.escape(f"€ {prod_cost_total:,.0f}".replace(",","."))}</div><div class="cost-pct">{int(prod_cost_total/costo_totale*100) if costo_totale else 0}%</div></div>
+    <div class="cost-right"><div class="cost-val">{html.escape(f"€ {prod_cost_total:,.0f}".replace(",","."))}</div><div class="cost-pct" id="prod-cost-pct"></div></div>
   </div>
   <div class="cost-total">
     <div class="cost-total-lbl">TOTAL JOB COST</div>
-    <div class="cost-total-val">{html.escape(f"€ {costo_totale:,.0f}".replace(",","."))}</div>
+    <div class="cost-total-val" id="total-cost-val">—</div>
   </div>
 </div>
 
@@ -1217,7 +1122,7 @@ tbody tr:hover{{background:var(--bg);}}
 <div class="charts">
   <div class="card"><div class="card-hdr"><div class="card-title">Effort by phase</div><div class="card-tag" id="phase-tag"></div></div><div class="cw"><canvas id="ch-phase"></canvas></div></div>
   <div class="card"><div class="card-hdr"><div class="card-title">Hours per person</div><div class="card-tag">h allocated</div></div><div class="cw"><canvas id="ch-persons"></canvas></div></div>
-  <div class="card"><div class="card-hdr"><div class="card-title">Cost split</div><div class="card-tag">by type</div></div><div class="cw"><canvas id="ch-split"></canvas></div></div>
+  <div class="card"><div class="card-hdr"><div class="card-title">Cost split</div><div class="card-tag" id="split-tag">by type</div></div><div class="cw"><canvas id="ch-split"></canvas></div></div>
 </div>
 
 <!-- TABLES -->
@@ -1236,25 +1141,68 @@ tbody tr:hover{{background:var(--bg);}}
 </div><!-- /wrap -->
 
 <script>
-const PAL      = {PAL_JS};
-const PINK     = "{PINK_JS}";
-const TEAM     = {team_js};
-const SUBCOS   = {subco_js};
-const ORE_PP   = {ore_pp_js};
-const COST_INT = {cost_int_js};
-const COST_SUB = {cost_sub_js};
-const PHASES   = {phases_js};
-const TASKS    = {tasks_js};
+const PAL         = {PAL_JS};
+const PINK        = "{PINK_JS}";
+const TEAM        = {team_js};
+const SUBCOS      = {subco_js};
+const ORE_PP      = {ore_pp_js};
+const COST_INT_LCR= {cost_int_lcr_js};
+const COST_INT_UCR= {cost_int_ucr_js};
+const COST_SUB    = {cost_sub_js};
+const PHASES      = {phases_js};
+const TASKS       = {tasks_js};
+const SUB_TOTAL   = {sub_total:.2f};
+const PROD_TOTAL  = {prod_cost_total:.2f};
+const TOTAL_QTY   = {total_qty_assets};
+let isLCR         = {init_lcr_js};
+let splitChart    = null;
 
 function ini(n){{const p=n.split(" ");return p.length>=2?(p[0][0]+p[p.length-1][0]).toUpperCase():n.slice(0,2).toUpperCase();}}
 function feur(v){{return "€ "+Math.round(v).toString().replace(/\\B(?=(\\d{{3}})+(?!\\d))/g,".");}}
 function fh(v){{return v.toFixed(1)+" h";}}
+function pct(v,t){{return t>0?Math.round(v/t*100)+"%":"0%";}}
 
 function pcolor(name){{
   const i=TEAM.findIndex(t=>t.name===name);
   if(i>=0)return PAL[i%PAL.length];
   const s=SUBCOS.findIndex(s=>s.name===name);
   return s>=0?PINK:"#94a3b8";
+}}
+
+function getCostInt(){{return isLCR?COST_INT_LCR:COST_INT_UCR;}}
+
+function setMode(lcr){{
+  isLCR=lcr;
+  document.getElementById("btn-lcr").classList.toggle("active",lcr);
+  document.getElementById("btn-ucr").classList.toggle("active",!lcr);
+  const lbl=lcr?"LCR":"UCR (BD)";
+  const costInt=Object.values(getCostInt()).reduce((a,b)=>a+b,0);
+  const total=costInt+SUB_TOTAL+PROD_TOTAL;
+  document.getElementById("rate-tag").textContent=lbl;
+  document.getElementById("int-rate-tag").textContent=lbl;
+  document.getElementById("int-cost-val").textContent=feur(costInt);
+  document.getElementById("int-cost-pct").textContent=pct(costInt,total);
+  document.getElementById("sub-cost-pct").textContent=pct(SUB_TOTAL,total);
+  document.getElementById("prod-cost-pct").textContent=pct(PROD_TOTAL,total);
+  document.getElementById("kpi-cost").textContent=feur(total);
+  document.getElementById("kpi-per-asset").textContent=feur(total/TOTAL_QTY);
+  document.getElementById("total-cost-val").textContent=feur(total);
+  // update donut
+  if(splitChart){{splitChart.data.datasets[0].data=[costInt,SUB_TOTAL,PROD_TOTAL];splitChart.update();}}
+  // rebuild person table
+  const ci=getCostInt();
+  const tbody=document.querySelector("#tbl-p tbody");tbody.innerHTML="";
+  Object.entries(ORE_PP).sort((a,b)=>b[1]-a[1]).forEach(([name,h])=>{{
+    const t=TEAM.find(t=>t.name===name);
+    const isSub=SUBCOS.some(s=>s.name===name);
+    const isI=t&&t.type==="intern";
+    const col=pcolor(name);
+    const cost=(ci[name]||0)+(COST_SUB[name]||0);
+    const typeHtml=isSub?'<span class="pill pill-sub">SUB</span>':isI?'<span class="pill pill-i">Intern</span>':'<span class="pill pill-s">Senior</span>';
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td><span class="av" style="background:${{col}}">${{ini(name)}}</span>${{name.split(" ")[0]}}</td><td>${{typeHtml}}</td><td>${{fh(h)}}</td><td>${{(h/8).toFixed(1)+" d"}}</td><td>${{cost>0?feur(cost):'<span class="muted">—</span>'}}</td>`;
+    tbody.appendChild(tr);
+  }});
 }}
 
 // ── Phase chart ──
@@ -1281,29 +1229,14 @@ new Chart(document.getElementById("ch-persons"),{{
   }}
 }});
 
-// ── Cost split donut ──
-const intT={int_total:.2f},subT={sub_total:.2f},prodT={prod_cost_total:.2f};
-new Chart(document.getElementById("ch-split"),{{
+// ── Cost split donut (dynamic) ──
+const initInt=Object.values(COST_INT_LCR).reduce((a,b)=>a+b,0);
+splitChart=new Chart(document.getElementById("ch-split"),{{
   type:"doughnut",
-  data:{{labels:["Internal","Subcontractors","Production (API)"],datasets:[{{data:[intT,subT,prodT],backgroundColor:["#65a30dcc","#ec4899cc","#2563ebcc"],borderColor:"#fff",borderWidth:3}}]}},
+  data:{{labels:["Internal","Subcontractors","Production (API)"],datasets:[{{data:[initInt,SUB_TOTAL,PROD_TOTAL],backgroundColor:["#65a30dcc","#ec4899cc","#2563ebcc"],borderColor:"#fff",borderWidth:3}}]}},
   options:{{responsive:true,maintainAspectRatio:false,cutout:"62%",
     plugins:{{legend:{{position:"bottom",labels:{{usePointStyle:true,padding:12,font:{{size:10}}}}}},tooltip:{{callbacks:{{label:c=>`${{c.label}}: ${{feur(c.parsed)}}`}}}}}}
   }}
-}});
-
-// ── Person table ──
-document.getElementById("person-tag").textContent=Object.keys(ORE_PP).length+" people";
-const tbody_p=document.querySelector("#tbl-p tbody");
-Object.entries(ORE_PP).sort((a,b)=>b[1]-a[1]).forEach(([name,h])=>{{
-  const t=TEAM.find(t=>t.name===name);
-  const isSub=SUBCOS.some(s=>s.name===name);
-  const isI=t&&t.type==="intern";
-  const col=pcolor(name);
-  const cost=(COST_INT[name]||0)+(COST_SUB[name]||0);
-  const typeHtml=isSub?'<span class="pill pill-sub">SUB</span>':isI?'<span class="pill pill-i">Intern</span>':'<span class="pill pill-s">Senior</span>';
-  const tr=document.createElement("tr");
-  tr.innerHTML=`<td><span class="av" style="background:${{col}}">${{ini(name)}}</span>${{name.split(" ")[0]}}</td><td>${{typeHtml}}</td><td>${{fh(h)}}</td><td>${{(h/8).toFixed(1)+" d"}}</td><td>${{cost>0?feur(cost):'<span class="muted">—</span>'}}</td>`;
-  tbody_p.appendChild(tr);
 }});
 
 // ── Task table ──
@@ -1317,6 +1250,7 @@ TASKS.sort((a,b)=>b.real_h-a.real_h).forEach(t=>{{
   tr.innerHTML=`<td style="font-weight:600">${{t.name}}</td><td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${{c}};margin-right:4px;vertical-align:middle"></span>${{t.phase}}</td><td>${{t.qty}}</td><td>${{fh(t.real_h)}}</td><td>${{t.prod_c>0?feur(t.prod_c):'<span class="muted">—</span>'}}</td>`;
   tbody_t.appendChild(tr);
 }});
+document.getElementById("person-tag").textContent=Object.keys(ORE_PP).length+" people";
 
 // ── Sort ──
 const _ss={{}};
@@ -1333,6 +1267,9 @@ function srt(id,col){{
   }});
   rows.forEach(r=>tb.querySelector("tbody").appendChild(r));
 }}
+
+// ── Init ──
+setMode({init_lcr_js});
 </script>
 </body></html>"""
 
