@@ -1005,8 +1005,8 @@ body{{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--fg
 .wrap{{max-width:1200px;margin:0 auto;padding:16px 16px 0;}}
 .sec{{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:20px 0 8px;}}
 /* ── KPIs ── */
-.kpis{{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px;}}
-@media(max-width:900px){{.kpis{{grid-template-columns:repeat(3,1fr);}}}}
+.kpis{{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:10px;}}
+@media(max-width:1100px){{.kpis{{grid-template-columns:repeat(3,1fr);}}}}
 @media(max-width:600px){{.kpis{{grid-template-columns:repeat(2,1fr);}}}}
 .kpi{{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px 16px;position:relative;overflow:hidden;box-shadow:var(--shadow);}}
 .kpi::before{{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--ka,var(--primary));border-radius:var(--radius) var(--radius) 0 0;}}
@@ -1121,6 +1121,11 @@ tbody tr:hover{{background:var(--bg);}}
     <div class="kpi-val" id="kpi-per-asset">—</div>
     <div class="kpi-sub">{total_qty_assets} total assets</div>
   </div>
+  <div class="kpi" style="--ka:#0f766e">
+    <div class="kpi-lbl">Deliverables</div>
+    <div class="kpi-val">{del_img + del_vid}</div>
+    <div class="kpi-sub">{del_img} images · {del_vid} videos</div>
+  </div>
 </div>
 
 <!-- COST BREAKDOWN -->
@@ -1145,29 +1150,6 @@ tbody tr:hover{{background:var(--bg);}}
   <div class="cost-total">
     <div class="cost-total-lbl">TOTAL JOB COST</div>
     <div class="cost-total-val" id="total-cost-val">—</div>
-  </div>
-</div>
-
-<!-- DELIVERABLES -->
-<div class="sec">Deliverables</div>
-<div class="dlv">
-  <div class="dlv-card">
-    <div>
-      <div class="dlv-num">{del_img}</div>
-      <div class="dlv-lbl">AI images</div>
-    </div>
-  </div>
-  <div class="dlv-card">
-    <div>
-      <div class="dlv-num">{del_vid}</div>
-      <div class="dlv-lbl">AI videos</div>
-    </div>
-  </div>
-  <div class="dlv-card" style="flex:2">
-    <div>
-      <div class="dlv-num">{del_img + del_vid}</div>
-      <div class="dlv-lbl">Total generated assets</div>
-    </div>
   </div>
 </div>
 
