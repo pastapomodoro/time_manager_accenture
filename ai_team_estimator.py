@@ -3,7 +3,7 @@ AI_Team Estimator — stima tempi e costi per AI_Team, Accenture Song.
 Run: python3 -m streamlit run ai_team_estimator.py
 """
 
-import os, json, html
+import os, json, html, math
 import streamlit as st
 import pandas as pd
 from io import BytesIO
@@ -634,6 +634,10 @@ def fmt_hours(value: float) -> str:
 
 def fmt_currency(value: float) -> str:
     return f"€ {value:,.0f}".replace(",", ".")
+
+
+def fmt_workdays_ceil(days: float) -> str:
+    return f"{max(1, math.ceil(days))} gg lav."
 
 
 def bento_kpi_html(label: str, value: str, sub: str = "") -> str:
@@ -1272,7 +1276,7 @@ with tab_job:
                 f'{bento_kpi_html("Tempo reale", fmt_hours(ore_reali_tot), f"{giorni_reali:.1f} gg persone")}'
                 f'{bento_kpi_html("Costo stimato", fmt_currency(costo_totale), "Basato su costo orario del team")}'
                 f'{bento_kpi_html("Effort totale", fmt_hours(ore_effort_tot), f"{giorni_effort:.1f} gg effort")}'
-                f'{bento_kpi_html("Durata calendario", f"{giorni_cal:.0f} gg lav." if giorni_cal else "—", "Con assegnazioni attuali")}'
+                f'{bento_kpi_html("Durata calendario", fmt_workdays_ceil(giorni_cal) if giorni_cal else "—", "Con assegnazioni attuali")}'
                 '</div>'
             ),
             unsafe_allow_html=True,
