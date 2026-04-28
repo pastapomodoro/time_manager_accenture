@@ -10,7 +10,7 @@ from io import BytesIO
 from datetime import datetime
 
 try:
-    from db import (is_supabase_configured, sign_in, sign_out,
+    from db import (is_supabase_configured, sign_in, sign_up, sign_out,
                     load_profiles_db, save_profiles_db,
                     load_presets_db, save_preset_db, delete_preset_db,
                     load_xlsx_from_storage, upload_xlsx_to_storage)
@@ -29,17 +29,40 @@ if _USE_SUPABASE:
         st.session_state.sb_session = None
     if st.session_state.sb_session is None:
         st.title("AI Team Estimator")
-        st.subheader("Accedi per continuare")
-        with st.form("login_form"):
-            email = st.text_input("Email")
-            pwd   = st.text_input("Password", type="password")
-            if st.form_submit_button("Accedi", use_container_width=True):
-                try:
-                    res = sign_in(email, pwd)
-                    st.session_state.sb_session = res.session
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Accesso negato: {e}")
+        tab_login, tab_signup = st.tabs(["Accedi", "Crea account"])
+
+        with tab_login:
+            with st.form("login_form"):
+                email = st.text_input("Email")
+                pwd   = st.text_input("Password", type="password")
+                if st.form_submit_button("Accedi", use_container_width=True):
+                    try:
+                        res = sign_in(email, pwd)
+                        st.session_state.sb_session = res.session
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Accesso negato: {e}")
+
+        with tab_signup:
+            with st.form("signup_form"):
+                new_email = st.text_input("Email")
+                new_pwd   = st.text_input("Password", type="password")
+                new_pwd2  = st.text_input("Conferma password", type="password")
+                if st.form_submit_button("Crea account", use_container_width=True):
+                    if not new_email or not new_pwd:
+                        st.error("Compila tutti i campi")
+                    elif new_pwd != new_pwd2:
+                        st.error("Le password non coincidono")
+                    else:
+                        try:
+                            res = sign_up(new_email, new_pwd)
+                            if res.session:
+                                st.session_state.sb_session = res.session
+                                st.rerun()
+                            else:
+                                st.success("Account creato! Controlla la email per confermare, poi accedi.")
+                        except Exception as e:
+                            st.error(f"Errore: {e}")
         st.stop()
 
 ORE_GIORNATA     = 8.0
