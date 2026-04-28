@@ -31,34 +31,152 @@ if _USE_SUPABASE:
         st.markdown("""
         <style>
         header[data-testid="stHeader"], #MainMenu, footer { display:none }
-        [data-testid="stAppViewContainer"] { background: oklch(0.9892 0.0054 117.9205) }
-        .block-container { max-width: 480px !important; padding-top: 6rem !important; }
-        div[data-testid="stForm"] {
-          background: #fff;
-          border: 1px solid oklch(0.9288 0.0126 255.5078);
-          border-radius: 12px;
-          padding: 2rem !important;
-          box-shadow: 0 2px 16px oklch(0 0 0 / .06);
+
+        /* ── ANIMATED BG ── */
+        [data-testid="stAppViewContainer"] {
+          background: #0a0f0a;
+          overflow: hidden;
         }
+        [data-testid="stAppViewContainer"]::before {
+          content: '';
+          position: fixed; inset: 0; z-index: 0;
+          background:
+            radial-gradient(ellipse 80% 60% at 20% 30%, oklch(0.55 0.18 140 / .35) 0%, transparent 60%),
+            radial-gradient(ellipse 60% 80% at 80% 70%, oklch(0.45 0.15 160 / .25) 0%, transparent 60%),
+            radial-gradient(ellipse 50% 50% at 50% 10%, oklch(0.7 0.22 128 / .15) 0%, transparent 50%);
+          animation: bgPulse 8s ease-in-out infinite alternate;
+        }
+        @keyframes bgPulse {
+          0%   { opacity: .8; transform: scale(1); }
+          100% { opacity: 1;  transform: scale(1.05); }
+        }
+
+        /* floating orbs */
+        [data-testid="stAppViewContainer"]::after {
+          content: '';
+          position: fixed; inset: 0; z-index: 0; pointer-events: none;
+          background:
+            radial-gradient(circle 200px at 10% 80%, oklch(0.8 0.22 128 / .12) 0%, transparent 70%),
+            radial-gradient(circle 150px at 90% 20%, oklch(0.6 0.18 145 / .10) 0%, transparent 70%);
+          animation: orbFloat 12s ease-in-out infinite alternate;
+        }
+        @keyframes orbFloat {
+          0%   { transform: translateY(0px) translateX(0px); }
+          100% { transform: translateY(-30px) translateX(20px); }
+        }
+
+        /* ── LAYOUT ── */
+        .block-container {
+          max-width: 460px !important;
+          padding-top: 0 !important;
+          position: relative; z-index: 10;
+          display: flex; flex-direction: column;
+          min-height: 100vh; justify-content: center;
+          margin: auto;
+        }
+
+        /* ── HERO TEXT ── */
+        .login-hero {
+          text-align: center; margin-bottom: 2.5rem;
+          animation: fadeUp .6s ease both;
+        }
+        .login-hero-badge {
+          display: inline-flex; align-items: center; gap: 6px;
+          background: oklch(0.8871 0.2122 128.5041 / .15);
+          border: 1px solid oklch(0.8871 0.2122 128.5041 / .35);
+          border-radius: 100px; padding: 4px 14px;
+          font-size: .75rem; font-weight: 600; letter-spacing: .06em;
+          color: oklch(0.8871 0.2122 128.5041); text-transform: uppercase;
+          margin-bottom: 1rem;
+        }
+        .login-hero-badge::before {
+          content: ''; width: 6px; height: 6px; border-radius: 50%;
+          background: oklch(0.8871 0.2122 128.5041);
+          animation: blink 1.5s ease infinite;
+        }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+        .login-hero h1 {
+          font-size: 2.6rem; font-weight: 800; line-height: 1.1;
+          letter-spacing: -.04em; margin: 0 0 .75rem;
+          background: linear-gradient(135deg, #fff 0%, oklch(0.8871 0.2122 128.5041) 100%);
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        .login-hero p {
+          font-size: .95rem; color: oklch(0.75 0 0); margin: 0;
+        }
+
+        /* ── CARD ── */
+        div[data-testid="stForm"] {
+          background: oklch(1 0 0 / .06) !important;
+          backdrop-filter: blur(24px) saturate(1.4) !important;
+          -webkit-backdrop-filter: blur(24px) saturate(1.4) !important;
+          border: 1px solid oklch(1 0 0 / .12) !important;
+          border-radius: 16px !important;
+          padding: 2rem !important;
+          box-shadow: 0 8px 48px oklch(0 0 0 / .4), inset 0 1px 0 oklch(1 0 0 / .08) !important;
+          animation: fadeUp .7s .1s ease both;
+        }
+        @keyframes fadeUp {
+          from { opacity:0; transform: translateY(24px); }
+          to   { opacity:1; transform: translateY(0); }
+        }
+
+        /* inputs dark */
+        div[data-testid="stForm"] input {
+          background: oklch(1 0 0 / .07) !important;
+          border: 1px solid oklch(1 0 0 / .15) !important;
+          border-radius: 8px !important;
+          color: #fff !important;
+          transition: border-color .2s, box-shadow .2s !important;
+        }
+        div[data-testid="stForm"] input::placeholder { color: oklch(0.6 0 0) !important; }
+        div[data-testid="stForm"] input:focus {
+          border-color: oklch(0.8871 0.2122 128.5041) !important;
+          box-shadow: 0 0 0 3px oklch(0.8871 0.2122 128.5041 / .2) !important;
+        }
+        div[data-testid="stForm"] label { color: oklch(0.8 0 0) !important; font-size:.85rem !important; }
+
+        /* card title */
+        div[data-testid="stForm"] strong { color: #fff !important; font-size: 1.05rem !important; }
+
+        /* submit button */
         div[data-testid="stFormSubmitButton"] button {
           background: oklch(0.8871 0.2122 128.5041) !important;
-          color: #000 !important; font-weight: 600 !important;
+          color: #000 !important; font-weight: 700 !important;
           border: none !important; border-radius: 8px !important;
+          letter-spacing: .01em !important;
+          transition: filter .15s, transform .15s !important;
         }
-        div[data-testid="stFormSubmitButton"] button:hover { filter: brightness(.92) !important }
+        div[data-testid="stFormSubmitButton"] button:hover {
+          filter: brightness(.9) !important;
+          transform: translateY(-1px) !important;
+        }
+        div[data-testid="stFormSubmitButton"] button:active { transform: translateY(0) !important; }
+
+        /* switch link button */
+        div[data-testid="stButton"] button {
+          background: transparent !important;
+          border: none !important; color: oklch(0.65 0 0) !important;
+          font-size: .82rem !important;
+        }
+        div[data-testid="stButton"] button:hover { color: oklch(0.8871 0.2122 128.5041) !important; }
         </style>
+
+        <div class="login-hero">
+          <div class="login-hero-badge">Accenture Song — AI Team</div>
+          <h1>AI Team<br>Estimator</h1>
+          <p>Stima tempi, costi e risorse del tuo team AI</p>
+        </div>
         """, unsafe_allow_html=True)
 
         if "auth_mode" not in st.session_state:
             st.session_state.auth_mode = "login"
 
-        st.markdown("### AI Team Estimator")
-        st.markdown("&nbsp;")
-
         if st.session_state.auth_mode == "login":
             with st.form("login_form"):
-                st.markdown("**Accedi**")
-                email = st.text_input("Email", placeholder="nome@azienda.com", label_visibility="collapsed")
+                st.markdown("**Accedi al tuo account**")
+                email = st.text_input("Email", placeholder="nome@accenture.com", label_visibility="collapsed")
                 pwd   = st.text_input("Password", type="password", placeholder="Password", label_visibility="collapsed")
                 if st.form_submit_button("Accedi", use_container_width=True):
                     try:
@@ -67,13 +185,13 @@ if _USE_SUPABASE:
                         st.rerun()
                     except Exception:
                         st.error("Credenziali non valide")
-            if st.button("Non hai un account? Registrati", use_container_width=True):
+            if st.button("Non hai un account? Registrati →", use_container_width=True):
                 st.session_state.auth_mode = "signup"
                 st.rerun()
         else:
             with st.form("signup_form"):
-                st.markdown("**Crea account**")
-                new_email = st.text_input("Email", placeholder="nome@azienda.com", label_visibility="collapsed")
+                st.markdown("**Crea il tuo account**")
+                new_email = st.text_input("Email", placeholder="nome@accenture.com", label_visibility="collapsed")
                 new_pwd   = st.text_input("Password", type="password", placeholder="Password", label_visibility="collapsed")
                 new_pwd2  = st.text_input("Conferma password", type="password", placeholder="Conferma password", label_visibility="collapsed")
                 if st.form_submit_button("Crea account", use_container_width=True):
@@ -93,7 +211,7 @@ if _USE_SUPABASE:
                                 st.success("Controlla la email per confermare, poi accedi.")
                         except Exception as e:
                             st.error(f"Errore: {e}")
-            if st.button("Hai già un account? Accedi", use_container_width=True):
+            if st.button("← Hai già un account? Accedi", use_container_width=True):
                 st.session_state.auth_mode = "login"
                 st.rerun()
         st.stop()
