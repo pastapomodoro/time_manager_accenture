@@ -28,41 +28,152 @@ if _USE_SUPABASE:
     if "sb_session" not in st.session_state:
         st.session_state.sb_session = None
     if st.session_state.sb_session is None:
-        st.title("AI Team Estimator")
-        tab_login, tab_signup = st.tabs(["Accedi", "Crea account"])
+        # ── LOGIN PAGE (shadcn login-01 style) ────────────────
+        st.markdown("""
+        <style>
+        :root {
+          --bg:      oklch(0.9892 0.0054 117.9205);
+          --card:    oklch(1.0000 0 0);
+          --primary: oklch(0.8871 0.2122 128.5041);
+          --primary-fg: oklch(0 0 0);
+          --fg:      oklch(0.2077 0.0398 265.7549);
+          --muted-fg:oklch(0.5544 0.0407 257.4166);
+          --border:  oklch(0.9288 0.0126 255.5078);
+          --accent:  oklch(0.9819 0.0181 155.8263);
+          --radius:  0.75rem;
+        }
+        /* hide default streamlit chrome on login */
+        header[data-testid="stHeader"] { display:none }
+        #MainMenu, footer { display:none }
+        [data-testid="stAppViewContainer"] {
+          background: var(--bg);
+          display: flex; align-items: center; justify-content: center;
+          min-height: 100vh;
+        }
+        [data-testid="stMain"] > div:first-child {
+          padding-top: 0 !important;
+        }
+        /* card wrapper */
+        .login-card {
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 2.5rem 2rem;
+          width: 100%;
+          max-width: 400px;
+          margin: 4rem auto 0;
+          box-shadow: 0 4px 32px oklch(0 0 0 / .06);
+        }
+        .login-logo {
+          display: flex; align-items: center; gap: 10px;
+          margin-bottom: 1.5rem;
+        }
+        .login-logo-icon {
+          width: 32px; height: 32px; border-radius: 8px;
+          background: var(--primary); display:grid; place-items:center;
+        }
+        .login-logo-icon svg { width:18px; height:18px; }
+        .login-logo-name {
+          font-size: 1rem; font-weight: 700; color: var(--fg);
+          letter-spacing: -.02em;
+        }
+        .login-title {
+          font-size: 1.4rem; font-weight: 700; color: var(--fg);
+          margin-bottom: .3rem; letter-spacing: -.02em;
+        }
+        .login-sub {
+          font-size: .875rem; color: var(--muted-fg); margin-bottom: 1.5rem;
+        }
+        /* style streamlit inputs inside card */
+        .login-card input[type="text"],
+        .login-card input[type="email"],
+        .login-card input[type="password"] {
+          border-radius: calc(var(--radius) - 2px) !important;
+          border-color: var(--border) !important;
+        }
+        .login-card input:focus {
+          border-color: var(--primary) !important;
+          box-shadow: 0 0 0 2px oklch(0.8871 0.2122 128.5041 / .25) !important;
+        }
+        /* primary button */
+        .login-card [data-testid="stFormSubmitButton"] button {
+          background: var(--primary) !important;
+          color: var(--primary-fg) !important;
+          font-weight: 600 !important;
+          border: none !important;
+          border-radius: calc(var(--radius) - 2px) !important;
+        }
+        .login-card [data-testid="stFormSubmitButton"] button:hover {
+          filter: brightness(.93) !important;
+        }
+        /* tabs */
+        .login-card [data-testid="stTabs"] button {
+          font-size: .85rem !important;
+        }
+        /* divider text */
+        .login-divider {
+          display:flex; align-items:center; gap:.75rem;
+          margin: 1.2rem 0; color: var(--muted-fg); font-size:.8rem;
+        }
+        .login-divider::before, .login-divider::after {
+          content:""; flex:1; height:1px; background:var(--border);
+        }
+        .login-footer {
+          text-align:center; font-size:.78rem; color:var(--muted-fg);
+          margin-top:1.2rem;
+        }
+        </style>
+        <div class="login-card">
+          <div class="login-logo">
+            <div class="login-logo-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+              </svg>
+            </div>
+            <span class="login-logo-name">AI Team Estimator</span>
+          </div>
+          <div class="login-title">Bentornato</div>
+          <div class="login-sub">Inserisci le tue credenziali per accedere</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        with tab_login:
-            with st.form("login_form"):
-                email = st.text_input("Email")
-                pwd   = st.text_input("Password", type="password")
-                if st.form_submit_button("Accedi", use_container_width=True):
-                    try:
-                        res = sign_in(email, pwd)
-                        st.session_state.sb_session = res.session
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Accesso negato: {e}")
+        with st.container():
+            st.markdown('<div class="login-card" style="margin-top:0;border-top:none;border-radius:0 0 var(--radius) var(--radius);padding-top:0">', unsafe_allow_html=True)
+            tab_login, tab_signup = st.tabs(["Accedi", "Crea account"])
 
-        with tab_signup:
-            with st.form("signup_form"):
-                new_email = st.text_input("Email")
-                new_pwd   = st.text_input("Password", type="password")
-                new_pwd2  = st.text_input("Conferma password", type="password")
-                if st.form_submit_button("Crea account", use_container_width=True):
-                    if not new_email or not new_pwd:
-                        st.error("Compila tutti i campi")
-                    elif new_pwd != new_pwd2:
-                        st.error("Le password non coincidono")
-                    else:
+            with tab_login:
+                with st.form("login_form"):
+                    email = st.text_input("Email", placeholder="nome@azienda.com")
+                    pwd   = st.text_input("Password", type="password", placeholder="••••••••")
+                    if st.form_submit_button("Accedi", use_container_width=True):
                         try:
-                            res = sign_up(new_email, new_pwd)
-                            if res.session:
-                                st.session_state.sb_session = res.session
-                                st.rerun()
-                            else:
-                                st.success("Account creato! Controlla la email per confermare, poi accedi.")
+                            res = sign_in(email, pwd)
+                            st.session_state.sb_session = res.session
+                            st.rerun()
                         except Exception as e:
-                            st.error(f"Errore: {e}")
+                            st.error(f"Credenziali non valide")
+
+            with tab_signup:
+                with st.form("signup_form"):
+                    new_email = st.text_input("Email", placeholder="nome@azienda.com")
+                    new_pwd   = st.text_input("Password", type="password", placeholder="••••••••")
+                    new_pwd2  = st.text_input("Conferma password", type="password", placeholder="••••••••")
+                    if st.form_submit_button("Crea account", use_container_width=True):
+                        if not new_email or not new_pwd:
+                            st.error("Compila tutti i campi")
+                        elif new_pwd != new_pwd2:
+                            st.error("Le password non coincidono")
+                        else:
+                            try:
+                                res = sign_up(new_email, new_pwd)
+                                if res.session:
+                                    st.session_state.sb_session = res.session
+                                    st.rerun()
+                                else:
+                                    st.success("Account creato! Controlla la email per confermare, poi accedi.")
+                            except Exception as e:
+                                st.error(f"Errore: {e}")
+            st.markdown('</div>', unsafe_allow_html=True)
         st.stop()
 
 ORE_GIORNATA     = 8.0
