@@ -898,10 +898,15 @@ def build_results_html(
     cal_days      = math.ceil(giorni_cal) if giorni_cal else 0
     total_qty_assets = sum(it["quantita"] for it in job_items) or 1
     # Deliverables: use override or auto-compute from AI gen tasks
-    _img_kw = ("image generation", "immagine")
-    _vid_kw = ("video generation", "video gen")
-    auto_img = sum(it["quantita"] for it in job_items if any(k in it["nome"].lower() for k in _img_kw))
-    auto_vid = sum(it["quantita"] for it in job_items if any(k in it["nome"].lower() for k in _vid_kw))
+    _img_kw = ("image generation", "immagine ai", "generazione immagine", "ai image")
+    _vid_kw = ("video generation", "generazione video", "video ai", "ai video")
+    def _is_img(name: str) -> bool:
+        n = name.lower()
+        return any(k in n for k in _img_kw) and not any(k in n for k in _vid_kw)
+    def _is_vid(name: str) -> bool:
+        return any(k in name.lower() for k in _vid_kw)
+    auto_img = sum(it["quantita"] for it in job_items if _is_img(it["nome"]))
+    auto_vid = sum(it["quantita"] for it in job_items if _is_vid(it["nome"]))
     del_img  = deliverables_img if deliverables_img > 0 else auto_img
     del_vid  = deliverables_vid if deliverables_vid > 0 else auto_vid
 
@@ -1147,14 +1152,12 @@ tbody tr:hover{{background:var(--bg);}}
 <div class="sec">Deliverables</div>
 <div class="dlv">
   <div class="dlv-card">
-    <div class="dlv-icon">🖼️</div>
     <div>
       <div class="dlv-num">{del_img}</div>
       <div class="dlv-lbl">AI images</div>
     </div>
   </div>
   <div class="dlv-card">
-    <div class="dlv-icon">🎬</div>
     <div>
       <div class="dlv-num">{del_vid}</div>
       <div class="dlv-lbl">AI videos</div>
