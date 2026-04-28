@@ -66,13 +66,15 @@ if _USE_SUPABASE:
         }
 
         /* ── LAYOUT ── */
+        [data-testid="stMain"] {
+          display: flex; align-items: center; justify-content: center;
+          min-height: 100vh;
+        }
         .block-container {
           max-width: 460px !important;
-          padding-top: 0 !important;
+          padding-top: 0 !important; padding-bottom: 0 !important;
           position: relative; z-index: 10;
-          display: flex; flex-direction: column;
-          min-height: 100vh; justify-content: center;
-          margin: auto;
+          width: 100%;
         }
 
         /* ── HERO TEXT ── */
@@ -164,7 +166,6 @@ if _USE_SUPABASE:
         </style>
 
         <div class="login-hero">
-          <div class="login-hero-badge">Accenture Song — AI Team</div>
           <h1>AI Team<br>Estimator</h1>
           <p>Stima tempi, costi e risorse del tuo team AI</p>
         </div>
