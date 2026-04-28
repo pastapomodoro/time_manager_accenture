@@ -176,15 +176,19 @@ def upload_xlsx_to_storage(file_bytes: bytes):
 
 
 # ── SUBCONTRACTORS ─────────────────────────────────────────────
+# Stored as a special preset row to avoid requiring a new Supabase table.
+
+_SUBCO_KEY = "__subcontractors__"
 
 def load_subcontractors_db() -> list[dict]:
-    rows = get_supabase().table("subcontractors").select("*").order("id").execute()
-    return rows.data or []
+    rows = get_supabase().table("presets").select("data").eq("nome", _SUBCO_KEY).execute()
+    if rows.data:
+        data = rows.data[0]["data"]
+        return data if isinstance(data, list) else []
+    return []
 
 
 def save_subcontractors_db(subcos: list[dict]):
     sb = get_supabase()
-    sb.table("subcontractors").delete().neq("id", 0).execute()
-    if subcos:
-        rows = [{k: v for k, v in s.items() if k != "id"} for s in subcos]
-        sb.table("subcontractors").insert(rows).execute()
+    sb.table("presets").delete().eq("nome", _SUBCO_KEY).execute()
+    sb.table("presets").insert({"nome": _SUBCO_KEY, "data": subcos}).execute()
