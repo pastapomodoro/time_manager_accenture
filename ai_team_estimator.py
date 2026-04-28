@@ -394,11 +394,16 @@ h1,h2,h3,h4 { color: var(--fg) !important; font-family: Inter, sans-serif !impor
   box-shadow: var(--shadow) !important;
 }
 [data-baseweb="tag"] {
-  background: var(--accent) !important;
-  color: var(--accent-fg) !important;
+  background: #dcfce7 !important;
+  color: #166534 !important;
   border-radius: 999px !important;
   font-weight: 600 !important;
 }
+[data-baseweb="tag"].tag-sub {
+  background: #fce7f3 !important;
+  color: #9d174d !important;
+}
+[data-baseweb="tag"].tag-sub svg { color: #9d174d !important; }
 
 /* ── RADIO (job type selector) ────────────────────────────── */
 [data-testid="stRadio"] > label {
@@ -486,6 +491,25 @@ hr { border-color: var(--border) !important; }
 .status-label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted-fg); }
 .status-label svg { flex-shrink: 0; }
 </style>
+<script>
+(function(){
+  function colorTags(){
+    document.querySelectorAll('[data-baseweb="tag"]').forEach(tag=>{
+      const txt = tag.textContent || '';
+      if(txt.includes('(SUB)')){
+        tag.style.background='#fce7f3';
+        tag.style.color='#9d174d';
+      } else {
+        tag.style.background='#dcfce7';
+        tag.style.color='#166534';
+      }
+    });
+  }
+  const obs = new MutationObserver(colorTags);
+  obs.observe(document.body, {childList:true, subtree:true});
+  colorTags();
+})();
+</script>
 """, unsafe_allow_html=True)
 
 # Lucide SVG snippets (16×16, stroke only)
@@ -1592,6 +1616,9 @@ with tab_job:
         active_rows["nome_lavorazione"].fillna("").astype(str).str.strip() != ""
     ].reset_index(drop=True)
 
+    rate_mode = "Units/hr"
+    use_day_rate = False
+
     if not active_rows.empty:
         h1, h2, h3, h4 = st.columns([3.4, 1.7, 1.8, 4.1])
         h1.markdown("`Task`")
@@ -1607,9 +1634,6 @@ with tab_job:
         st.session_state["rate_mode_idx"] = 0 if rate_mode == "Units/hr" else 1
         use_day_rate = rate_mode == "Units/day"
         h4.markdown("`Assigned to`")
-    else:
-        rate_mode = "Units/hr"
-        use_day_rate = False
 
         for row_idx, row in active_rows.iterrows():
             current_names = parse_assigned_people(row.get("assegnato_a", ""), nomi_disponibili_job)
@@ -1721,10 +1745,9 @@ with tab_job:
     # ── Deliverables override ──
     st.divider()
     st.markdown(f'<div class="sec-hdr">{ICO_CLIP} Deliverables</div>', unsafe_allow_html=True)
-    st.caption("Override how many final assets are delivered. Leave at 0 to auto-count from AI generation tasks.")
     dv1, dv2 = st.columns(2)
-    deliverables_img = dv1.number_input("AI images delivered", min_value=0, step=1, value=0, key="dlv_img")
-    deliverables_vid = dv2.number_input("AI videos delivered", min_value=0, step=1, value=0, key="dlv_vid")
+    deliverables_img = dv1.number_input("Images", min_value=0, step=1, value=0, key="dlv_img", help="Leave 0 to auto-count from AI image tasks")
+    deliverables_vid = dv2.number_input("Videos", min_value=0, step=1, value=0, key="dlv_vid", help="Leave 0 to auto-count from AI video tasks")
 
     # ── Results ──
     st.divider()
