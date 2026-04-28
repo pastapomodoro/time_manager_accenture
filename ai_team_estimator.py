@@ -394,8 +394,6 @@ h1,h2,h3,h4 { color: var(--fg) !important; font-family: Inter, sans-serif !impor
   box-shadow: var(--shadow) !important;
 }
 [data-baseweb="tag"] {
-  background: var(--primary) !important;
-  color: var(--fg) !important;
   border-radius: 999px !important;
   font-weight: 700 !important;
 }
@@ -486,6 +484,20 @@ hr { border-color: var(--border) !important; }
 .status-label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted-fg); }
 .status-label svg { flex-shrink: 0; }
 </style>
+<script>
+setInterval(function(){
+  document.querySelectorAll('[data-baseweb="tag"]').forEach(function(tag){
+    var t = tag.innerText || '';
+    if(t.includes('(SUB)')){
+      tag.style.background='#ec4899'; tag.style.color='#fff';
+    } else if(t.includes('(INT)')){
+      tag.style.background='#2563eb'; tag.style.color='#fff';
+    } else {
+      tag.style.background='#84cc16'; tag.style.color='#1a2e05';
+    }
+  });
+}, 200);
+</script>
 """, unsafe_allow_html=True)
 
 # Lucide SVG snippets (16×16, stroke only)
@@ -1482,6 +1494,7 @@ with tab_job:
     subco_list = load_subcontractors()
     subco_names = {s["nome"] for s in subco_list}
     subco_rate_map = {s["nome"]: clean_float(s.get("costo_orario", 0)) for s in subco_list}
+    intern_names = {row["nome"] for _, row in df_team.iterrows() if str(row.get("ruolo","")).strip() == "Intern"} if not df_team.empty else set()
 
     if df_team.empty and not subco_list:
         st.warning("No team members found. Go to **Team Profiles** tab to add them.")
@@ -1572,7 +1585,7 @@ with tab_job:
             "Team on job",
             options=tutti_nomi,
             default=team_scope_default,
-            format_func=lambda n: (f"{initials(n)}  {n} (SUB)" if n in subco_names else f"{initials(n)}  {n}"),
+            format_func=lambda n: (f"{initials(n)}  {n} (SUB)" if n in subco_names else (f"{initials(n)}  {n} (INT)" if n in intern_names else f"{initials(n)}  {n}")),
             placeholder="Select who will work on this job…",
             help="Leave empty to include the whole team.",
             key="job_team_scope",
@@ -1644,7 +1657,7 @@ with tab_job:
                 "Assigned to",
                 options=nomi_disponibili_job,
                 default=current_names,
-                format_func=lambda n: (f"{initials(n)}  {n} (SUB)" if n in subco_names else f"{initials(n)}  {n}"),
+                format_func=lambda n: (f"{initials(n)}  {n} (SUB)" if n in subco_names else (f"{initials(n)}  {n} (INT)" if n in intern_names else f"{initials(n)}  {n}")),
                 key=f"assign_{st.session_state.job_editor_version}_{row_idx}",
                 placeholder="Select one or more people...",
                 label_visibility="collapsed",
