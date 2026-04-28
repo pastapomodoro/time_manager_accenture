@@ -299,8 +299,8 @@ html, body, [class*="css"] {
 
 /* ── TOPBAR brand strip ───────────────────────────────────── */
 [data-testid="stHeader"] {
-  background: var(--fg) !important;
-  border-bottom: none !important;
+  background: var(--card) !important;
+  border-bottom: 1px solid var(--border) !important;
 }
 
 /* ── SIDEBAR ─────────────────────────────────────────────── */
