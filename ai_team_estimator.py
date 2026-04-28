@@ -137,7 +137,7 @@ if _USE_SUPABASE:
           border-color: oklch(0.8871 0.2122 128.5041) !important;
           box-shadow: 0 0 0 3px oklch(0.8871 0.2122 128.5041 / .2) !important;
         }
-        div[data-testid="stForm"] label { color: oklch(0.5544 0.0407 257.4166) !important; font-size:.85rem !important; }
+        div[data-testid="stForm"] label { display: none !important; }
 
         /* card title */
         div[data-testid="stForm"] strong { color: oklch(0.2077 0.0398 265.7549) !important; font-size: 1.05rem !important; }
