@@ -9,12 +9,47 @@ import pandas as pd
 from io import BytesIO
 from datetime import datetime
 
+try:
+    from db import (is_supabase_configured, sign_in, sign_out,
+                    load_profiles_db, save_profiles_db,
+                    load_presets_db, save_preset_db, delete_preset_db,
+                    load_xlsx_from_storage, upload_xlsx_to_storage)
+    _HAS_SUPABASE = True
+except ImportError:
+    _HAS_SUPABASE = False
+
+_USE_SUPABASE = _HAS_SUPABASE and is_supabase_configured() if _HAS_SUPABASE else False
+
 # ── CONFIG ────────────────────────────────────────────────────
 st.set_page_config(page_title="AI Team Estimator", layout="wide")
 
-OVERHEAD_DEFAULT = 1.3
+# ── AUTH GATE (solo se Supabase configurato) ──────────────────
+if _USE_SUPABASE:
+    if "sb_session" not in st.session_state:
+        st.session_state.sb_session = None
+    if st.session_state.sb_session is None:
+        st.title("AI Team Estimator")
+        st.subheader("Accedi per continuare")
+        with st.form("login_form"):
+            email = st.text_input("Email")
+            pwd   = st.text_input("Password", type="password")
+            if st.form_submit_button("Accedi", use_container_width=True):
+                try:
+                    res = sign_in(email, pwd)
+                    st.session_state.sb_session = res.session
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Accesso negato: {e}")
+        st.stop()
+
 ORE_GIORNATA     = 8.0
-DEFAULT_XLSX     = os.path.join(os.path.dirname(__file__), "ai_team_data.xlsx")
+# Percorso Excel: stessa cartella dello script, oppure file ovunque con env AI_TEAM_DATA_XLSX
+_XLSX_ENV = os.environ.get("AI_TEAM_DATA_XLSX", "").strip()
+DEFAULT_XLSX = (
+    os.path.abspath(os.path.expanduser(os.path.normpath(_XLSX_ENV)))
+    if _XLSX_ENV
+    else os.path.join(os.path.dirname(__file__), "ai_team_data.xlsx")
+)
 PRESETS_FILE     = os.path.join(os.path.dirname(__file__), "presets.json")
 PROFILES_FILE    = os.path.join(os.path.dirname(__file__), "profiles.json")
 
@@ -208,17 +243,25 @@ def avatars_html(names, color_map) -> str:
 
 # ── STORAGE ───────────────────────────────────────────────────
 def load_presets() -> dict:
+    if _USE_SUPABASE:
+        return load_presets_db()
     return json.load(open(PRESETS_FILE)) if os.path.exists(PRESETS_FILE) else {}
 
 def save_presets(p: dict):
-    json.dump(p, open(PRESETS_FILE, "w"), indent=2, ensure_ascii=False)
+    if not _USE_SUPABASE:
+        json.dump(p, open(PRESETS_FILE, "w"), indent=2, ensure_ascii=False)
 
 def load_profiles() -> list[dict] | None:
-    """Ritorna lista profili da profiles.json, o None se non esiste."""
+    if _USE_SUPABASE:
+        data = load_profiles_db()
+        return data if data else None
     return json.load(open(PROFILES_FILE)) if os.path.exists(PROFILES_FILE) else None
 
 def save_profiles(profiles: list[dict]):
-    json.dump(profiles, open(PROFILES_FILE, "w"), indent=2, ensure_ascii=False)
+    if _USE_SUPABASE:
+        save_profiles_db(profiles)
+    else:
+        json.dump(profiles, open(PROFILES_FILE, "w"), indent=2, ensure_ascii=False)
 
 
 # ── LOADER ────────────────────────────────────────────────────
@@ -260,13 +303,12 @@ def get_team_df() -> pd.DataFrame:
 # ── EXPORT ────────────────────────────────────────────────────
 def build_export_excel(nome_progetto, job_items, ore_pp, costo_pp,
                        costo_totale, ore_reali_tot, giorni_reali,
-                       overhead, df_team) -> bytes:
+                       df_team) -> bytes:
     buf = BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
         pd.DataFrame([
             {"Campo":"Progetto",      "Valore": nome_progetto},
             {"Campo":"Data",          "Valore": datetime.now().strftime("%d/%m/%Y")},
-            {"Campo":"Overhead",      "Valore": f"×{overhead}"},
             {"Campo":"Tempo reale",   "Valore": f"{ore_reali_tot:.1f} h"},
             {"Campo":"Giorni reali",  "Valore": f"{giorni_reali:.1f}"},
             {"Campo":"Costo stimato", "Valore": f"€ {costo_totale:,.0f}"},
@@ -276,9 +318,8 @@ def build_export_excel(nome_progetto, job_items, ore_pp, costo_pp,
             "Lavorazione": it["nome"], "Quantità": it["quantita"],
             "Unità/ora": it["uph"],
             "Ore base": round(it["quantita"]/it["uph"], 2),
-            "Ore (overhead)": round(it["quantita"]/it["uph"]*overhead, 2),
-            "Ore reali": round(it["quantita"]/it["uph"]*overhead/len(it["assigned"]), 2),
-            "Giorni reali": round(it["quantita"]/it["uph"]*overhead/len(it["assigned"])/ORE_GIORNATA, 2),
+            "Ore reali": round(it["quantita"]/it["uph"]/len(it["assigned"]), 2),
+            "Giorni reali": round(it["quantita"]/it["uph"]/len(it["assigned"])/ORE_GIORNATA, 2),
             "Assegnato a": ", ".join(it["assigned"]),
         } for it in job_items]).to_excel(w, sheet_name="Lavorazioni", index=False)
 
@@ -297,10 +338,35 @@ with st.sidebar:
     st.title("AI Team Estimator")
     st.divider()
 
-    if os.path.exists(DEFAULT_XLSX):
+    if _USE_SUPABASE:
+        file_bytes = load_xlsx_from_storage()
+        if file_bytes:
+            st.caption("Excel caricato da Supabase Storage")
+            with st.expander("Sostituisci file Excel"):
+                up = st.file_uploader("Nuovo Excel", type=["xlsx"])
+                if up and st.button("Carica su Supabase", use_container_width=True):
+                    upload_xlsx_to_storage(up.getvalue())
+                    st.cache_data.clear()
+                    st.toast("File aggiornato")
+                    st.rerun()
+        else:
+            st.warning("Nessun Excel nel bucket Supabase.")
+            up = st.file_uploader("Carica ai_team_data.xlsx", type=["xlsx"])
+            if up and st.button("Carica su Supabase", use_container_width=True):
+                upload_xlsx_to_storage(up.getvalue())
+                st.rerun()
+            file_bytes = up.getvalue() if up else None
+        st.divider()
+        if st.button("Esci", use_container_width=True):
+            sign_out()
+            st.rerun()
+    elif os.path.exists(DEFAULT_XLSX):
         with open(DEFAULT_XLSX, "rb") as f:
             file_bytes = f.read()
-        st.caption("`ai_team_data.xlsx` caricato")
+        if _XLSX_ENV:
+            st.caption(f"Excel caricato da: `{DEFAULT_XLSX}`")
+        else:
+            st.caption("`ai_team_data.xlsx` caricato")
         with st.expander("Sostituisci file"):
             up = st.file_uploader("Carica un altro Excel", type=["xlsx"])
             if up:
@@ -318,10 +384,6 @@ with st.sidebar:
     except ValueError as e:
         st.error(str(e))
         st.stop()
-
-    st.divider()
-    overhead = st.slider("Buffer overhead ×", 1.0, 2.0, OVERHEAD_DEFAULT, 0.05,
-                         help="1.3 = +30% per riunioni, rework, imprevisti")
 
     # Legenda team (usa profili aggiornati)
     st.divider()
@@ -363,7 +425,11 @@ with tab_job:
                                       label_visibility="collapsed")
     with top_r:
         pc = st.columns([4,1,0.7])
-        preset_sel  = pc[0].selectbox("Preset", ["— nessuno —"] + list(presets.keys()),
+        preset_options = ["— nessuno —"] + list(presets.keys())
+        saved_sel = st.session_state.get("preset_sel", "— nessuno —")
+        sel_index = preset_options.index(saved_sel) if saved_sel in preset_options else 0
+        preset_sel  = pc[0].selectbox("Preset", preset_options,
+                                       index=sel_index,
                                        label_visibility="collapsed")
         load_clicked = pc[1].button("Carica", use_container_width=True)
         del_clicked  = pc[2].button("X", use_container_width=True, help="Elimina preset selezionato")
@@ -372,10 +438,15 @@ with tab_job:
         st.session_state.preset_data = {}
     if load_clicked and preset_sel != "— nessuno —":
         st.session_state.preset_data = presets[preset_sel]
+        st.session_state.preset_sel = preset_sel
         st.toast(f"Preset «{preset_sel}» caricato")
         st.rerun()
     if del_clicked and preset_sel != "— nessuno —":
-        del presets[preset_sel]; save_presets(presets)
+        if _USE_SUPABASE:
+            delete_preset_db(preset_sel)
+        else:
+            del presets[preset_sel]; save_presets(presets)
+        st.session_state.preset_sel = "— nessuno —"
         st.toast(f"Preset «{preset_sel}» eliminato")
         st.rerun()
     pd_data = st.session_state.preset_data
@@ -436,7 +507,10 @@ with tab_job:
             else:
                 snap = {it["nome"]: {"uph":it["uph"],"qty":it["quantita"],"assigned":it["assigned"]}
                         for it in job_items}
-                presets[pname.strip()] = snap; save_presets(presets)
+                if _USE_SUPABASE:
+                    save_preset_db(pname.strip(), snap)
+                else:
+                    presets[pname.strip()] = snap; save_presets(presets)
                 st.success(f"Preset «{pname.strip()}» salvato")
 
     # Risultati
@@ -452,10 +526,9 @@ with tab_job:
 
         for it in job_items:
             ob = it["quantita"] / it["uph"]
-            oc = ob * overhead
             n  = len(it["assigned"])
-            or_ = oc / n
-            ore_base_tot += ob; ore_effort_tot += oc; ore_reali_tot += or_
+            or_ = ob / n
+            ore_base_tot += ob; ore_effort_tot += ob; ore_reali_tot += or_
             for nome in it["assigned"]:
                 t = float(df_team.loc[df_team["nome"]==nome,"costo_orario"].iloc[0])
                 ore_pp[nome]   = ore_pp.get(nome,0)   + or_
@@ -469,13 +542,12 @@ with tab_job:
         giorni_cal = (ore_reali_tot / cap * 5) if cap > 0 else None
 
         m1,m2,m3,m4 = st.columns(4)
-        m1.metric("Tempo reale", f"{ore_reali_tot:.1f} h",
-                  help=f"Senza overhead: {ore_base_tot:.1f} h")
+        m1.metric("Tempo reale", f"{ore_reali_tot:.1f} h")
         m2.metric("Giorni reali", f"{giorni_reali:.1f}")
         m3.metric("Costo stimato", f"€ {costo_totale:,.0f}")
         if giorni_cal:
             m4.metric("Durata calendario", f"{giorni_cal:.0f} giorni lav.")
-        st.caption(f"Overhead ×{overhead}  ·  Effort totale: {ore_effort_tot:.1f} h ({giorni_effort:.1f} gg)")
+        st.caption(f"Effort totale: {ore_effort_tot:.1f} h ({giorni_effort:.1f} gg)")
 
         with st.expander("Dettaglio per persona"):
             st.dataframe(pd.DataFrame([{
@@ -490,15 +562,14 @@ with tab_job:
             st.dataframe(pd.DataFrame([{
                 "Lavorazione": it["nome"], "Qta": it["quantita"], "Unità/ora": it["uph"],
                 "Ore base": round(it["quantita"]/it["uph"],1),
-                "Ore (overhead)": round(it["quantita"]/it["uph"]*overhead,1),
-                "Giorni reali": round(it["quantita"]/it["uph"]*overhead/len(it["assigned"])/ORE_GIORNATA,1),
+                "Giorni reali": round(it["quantita"]/it["uph"]/len(it["assigned"])/ORE_GIORNATA,1),
                 "Assegnato a": ", ".join(it["assigned"]),
             } for it in job_items]), hide_index=True, use_container_width=True)
 
         st.divider()
         excel_b = build_export_excel(nome_progetto or "Stima", job_items,
                                       ore_pp, costo_pp, costo_totale,
-                                      ore_reali_tot, giorni_reali, overhead, df_team)
+                                      ore_reali_tot, giorni_reali, df_team)
         st.download_button(f"Esporta stima in Excel", data=excel_b,
                            file_name=f"stima_{(nome_progetto or 'job').replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -588,15 +659,17 @@ with tab_profili:
         st.success("Profili salvati")
         st.rerun()
 
-    if sc[1].button("Ripristina da Excel", use_container_width=True):
+    if not _USE_SUPABASE:
+        if sc[1].button("Ripristina da Excel", use_container_width=True):
+            if os.path.exists(PROFILES_FILE):
+                os.remove(PROFILES_FILE)
+                st.toast("Profili ripristinati dall'Excel")
+                st.rerun()
+            else:
+                st.info("Stai già usando i dati dall'Excel.")
         if os.path.exists(PROFILES_FILE):
-            os.remove(PROFILES_FILE)
-            st.toast("Profili ripristinati dall'Excel")
-            st.rerun()
+            sc[2].markdown(f'<div class="status-label">{ICO_CHECK} Profili personalizzati attivi</div>', unsafe_allow_html=True)
         else:
-            st.info("Stai già usando i dati dall'Excel.")
-
-    if os.path.exists(PROFILES_FILE):
-        sc[2].markdown(f'<div class="status-label">{ICO_CHECK} Profili personalizzati attivi</div>', unsafe_allow_html=True)
+            sc[2].markdown(f'<div class="status-label">{ICO_FILE} Dati da Excel</div>', unsafe_allow_html=True)
     else:
-        sc[2].markdown(f'<div class="status-label">{ICO_FILE} Dati da Excel</div>', unsafe_allow_html=True)
+        sc[2].markdown(f'<div class="status-label">{ICO_CHECK} Supabase</div>', unsafe_allow_html=True)
