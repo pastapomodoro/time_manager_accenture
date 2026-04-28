@@ -34,21 +34,21 @@ if _USE_SUPABASE:
 
         /* ── ANIMATED BG ── */
         [data-testid="stAppViewContainer"] {
-          background: #0a0f0a;
+          background: oklch(0.9892 0.0054 117.9205);
           overflow: hidden;
         }
         [data-testid="stAppViewContainer"]::before {
           content: '';
           position: fixed; inset: 0; z-index: 0;
           background:
-            radial-gradient(ellipse 80% 60% at 20% 30%, oklch(0.55 0.18 140 / .35) 0%, transparent 60%),
-            radial-gradient(ellipse 60% 80% at 80% 70%, oklch(0.45 0.15 160 / .25) 0%, transparent 60%),
-            radial-gradient(ellipse 50% 50% at 50% 10%, oklch(0.7 0.22 128 / .15) 0%, transparent 50%);
-          animation: bgPulse 8s ease-in-out infinite alternate;
+            radial-gradient(ellipse 70% 55% at 15% 25%, oklch(0.88 0.18 128 / .30) 0%, transparent 60%),
+            radial-gradient(ellipse 55% 70% at 85% 75%, oklch(0.82 0.14 145 / .20) 0%, transparent 60%),
+            radial-gradient(ellipse 50% 40% at 55% 5%,  oklch(0.92 0.12 118 / .25) 0%, transparent 55%);
+          animation: bgPulse 9s ease-in-out infinite alternate;
         }
         @keyframes bgPulse {
-          0%   { opacity: .8; transform: scale(1); }
-          100% { opacity: 1;  transform: scale(1.05); }
+          0%   { opacity: .7; transform: scale(1); }
+          100% { opacity: 1;  transform: scale(1.04); }
         }
 
         /* floating orbs */
@@ -56,13 +56,13 @@ if _USE_SUPABASE:
           content: '';
           position: fixed; inset: 0; z-index: 0; pointer-events: none;
           background:
-            radial-gradient(circle 200px at 10% 80%, oklch(0.8 0.22 128 / .12) 0%, transparent 70%),
-            radial-gradient(circle 150px at 90% 20%, oklch(0.6 0.18 145 / .10) 0%, transparent 70%);
-          animation: orbFloat 12s ease-in-out infinite alternate;
+            radial-gradient(circle 240px at 8% 82%,  oklch(0.87 0.20 128 / .18) 0%, transparent 70%),
+            radial-gradient(circle 180px at 92% 18%, oklch(0.80 0.16 140 / .14) 0%, transparent 70%);
+          animation: orbFloat 13s ease-in-out infinite alternate;
         }
         @keyframes orbFloat {
           0%   { transform: translateY(0px) translateX(0px); }
-          100% { transform: translateY(-30px) translateX(20px); }
+          100% { transform: translateY(-28px) translateX(18px); }
         }
 
         /* ── LAYOUT ── */
@@ -82,11 +82,11 @@ if _USE_SUPABASE:
         }
         .login-hero-badge {
           display: inline-flex; align-items: center; gap: 6px;
-          background: oklch(0.8871 0.2122 128.5041 / .15);
-          border: 1px solid oklch(0.8871 0.2122 128.5041 / .35);
+          background: oklch(0.8871 0.2122 128.5041 / .18);
+          border: 1px solid oklch(0.8871 0.2122 128.5041 / .45);
           border-radius: 100px; padding: 4px 14px;
           font-size: .75rem; font-weight: 600; letter-spacing: .06em;
-          color: oklch(0.8871 0.2122 128.5041); text-transform: uppercase;
+          color: oklch(0.38 0.14 140); text-transform: uppercase;
           margin-bottom: 1rem;
         }
         .login-hero-badge::before {
@@ -98,23 +98,23 @@ if _USE_SUPABASE:
         .login-hero h1 {
           font-size: 2.6rem; font-weight: 800; line-height: 1.1;
           letter-spacing: -.04em; margin: 0 0 .75rem;
-          background: linear-gradient(135deg, #fff 0%, oklch(0.8871 0.2122 128.5041) 100%);
+          background: linear-gradient(135deg, oklch(0.2077 0.0398 265.7549) 0%, oklch(0.42 0.18 140) 100%);
           -webkit-background-clip: text; -webkit-text-fill-color: transparent;
           background-clip: text;
         }
         .login-hero p {
-          font-size: .95rem; color: oklch(0.75 0 0); margin: 0;
+          font-size: .95rem; color: oklch(0.5544 0.0407 257.4166); margin: 0;
         }
 
         /* ── CARD ── */
         div[data-testid="stForm"] {
-          background: oklch(1 0 0 / .06) !important;
-          backdrop-filter: blur(24px) saturate(1.4) !important;
-          -webkit-backdrop-filter: blur(24px) saturate(1.4) !important;
-          border: 1px solid oklch(1 0 0 / .12) !important;
+          background: oklch(1 0 0 / .75) !important;
+          backdrop-filter: blur(20px) saturate(1.6) !important;
+          -webkit-backdrop-filter: blur(20px) saturate(1.6) !important;
+          border: 1px solid oklch(0.9288 0.0126 255.5078) !important;
           border-radius: 16px !important;
           padding: 2rem !important;
-          box-shadow: 0 8px 48px oklch(0 0 0 / .4), inset 0 1px 0 oklch(1 0 0 / .08) !important;
+          box-shadow: 0 4px 32px oklch(0 0 0 / .08), inset 0 1px 0 oklch(1 0 0 / .9) !important;
           animation: fadeUp .7s .1s ease both;
         }
         @keyframes fadeUp {
@@ -122,23 +122,23 @@ if _USE_SUPABASE:
           to   { opacity:1; transform: translateY(0); }
         }
 
-        /* inputs dark */
+        /* inputs */
         div[data-testid="stForm"] input {
-          background: oklch(1 0 0 / .07) !important;
-          border: 1px solid oklch(1 0 0 / .15) !important;
+          background: oklch(0.98 0.004 118) !important;
+          border: 1px solid oklch(0.9288 0.0126 255.5078) !important;
           border-radius: 8px !important;
-          color: #fff !important;
+          color: oklch(0.2077 0.0398 265.7549) !important;
           transition: border-color .2s, box-shadow .2s !important;
         }
-        div[data-testid="stForm"] input::placeholder { color: oklch(0.6 0 0) !important; }
+        div[data-testid="stForm"] input::placeholder { color: oklch(0.65 0.02 257) !important; }
         div[data-testid="stForm"] input:focus {
           border-color: oklch(0.8871 0.2122 128.5041) !important;
           box-shadow: 0 0 0 3px oklch(0.8871 0.2122 128.5041 / .2) !important;
         }
-        div[data-testid="stForm"] label { color: oklch(0.8 0 0) !important; font-size:.85rem !important; }
+        div[data-testid="stForm"] label { color: oklch(0.5544 0.0407 257.4166) !important; font-size:.85rem !important; }
 
         /* card title */
-        div[data-testid="stForm"] strong { color: #fff !important; font-size: 1.05rem !important; }
+        div[data-testid="stForm"] strong { color: oklch(0.2077 0.0398 265.7549) !important; font-size: 1.05rem !important; }
 
         /* submit button */
         div[data-testid="stFormSubmitButton"] button {
@@ -157,10 +157,10 @@ if _USE_SUPABASE:
         /* switch link button */
         div[data-testid="stButton"] button {
           background: transparent !important;
-          border: none !important; color: oklch(0.65 0 0) !important;
+          border: none !important; color: oklch(0.5544 0.0407 257.4166) !important;
           font-size: .82rem !important;
         }
-        div[data-testid="stButton"] button:hover { color: oklch(0.8871 0.2122 128.5041) !important; }
+        div[data-testid="stButton"] button:hover { color: oklch(0.42 0.18 140) !important; }
         </style>
 
         <div class="login-hero">
