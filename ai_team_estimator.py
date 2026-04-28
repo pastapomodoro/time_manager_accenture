@@ -5,6 +5,7 @@ Run: python3 -m streamlit run ai_team_estimator.py
 
 import os, json, html, math
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
@@ -1006,6 +1007,329 @@ def build_template_excel(source_bytes: bytes | None = None) -> bytes:
     return buf.getvalue()
 
 
+# ── RESULTS DASHBOARD HTML ────────────────────────────────────
+def build_results_html(
+    nome_progetto, start_date, deadline_value, working_days,
+    chargeable, job_items, df_team, subco_list,
+    ore_pp, costo_pp_internal, costo_pp_subco,
+    prod_cost_total, costo_totale, giorni_cal,
+) -> str:
+    PAL_JS  = json.dumps(["#7C3AED","#2563EB","#059669","#D97706","#DC2626","#0891B2","#65A30D","#C026D3","#EA580C","#0F766E"])
+    PINK_JS = "#EC4899"
+
+    rate_label = "LCR" if chargeable else "UCR (BD)"
+    int_total  = sum(costo_pp_internal.values())
+    sub_total  = sum(costo_pp_subco.values())
+    effort_h   = sum(it["quantita"] / it["uph"] for it in job_items)
+    elapsed_h  = sum(ore_pp.values())
+    cal_days   = math.ceil(giorni_cal) if giorni_cal else 0
+
+    # Build data arrays for JS
+    team_js = json.dumps([{
+        "name": r["nome"],
+        "role": str(r.get("ruolo","")).strip(),
+        "type": "intern" if str(r.get("ruolo","")).strip() == "Intern" else "internal",
+        "rate": float(r.get("costo_lcr" if chargeable else "costo_ucr", 0)),
+    } for _, r in df_team.iterrows()] if not df_team.empty else [])
+
+    subco_js = json.dumps([{
+        "name": s["nome"],
+        "role": str(s.get("ruolo","")).strip(),
+        "rate": float(s.get("costo_orario",0)),
+    } for s in subco_list])
+
+    # Phase map
+    phase_map: dict[str,float] = {}
+    task_rows_js = []
+    for it in job_items:
+        fase = str(it.get("fase","")).strip() or "OTHER"
+        base_h = it["quantita"] / it["uph"]
+        real_h = base_h / max(len(it["assigned"]),1)
+        prod_c = it.get("prod_cost",0.0)
+        phase_map[fase] = phase_map.get(fase,0) + base_h
+        task_rows_js.append({
+            "name": it["nome"], "phase": fase,
+            "qty": it["quantita"], "uph": it["uph"],
+            "assigned": it["assigned"],
+            "base_h": round(base_h,2),
+            "real_h": round(real_h * len(it["assigned"]),2),
+            "prod_c": round(prod_c,2),
+        })
+    phases_js   = json.dumps(phase_map)
+    tasks_js    = json.dumps(task_rows_js)
+    ore_pp_js   = json.dumps({k: round(v,2) for k,v in ore_pp.items()})
+    cost_int_js = json.dumps({k: round(v,2) for k,v in costo_pp_internal.items()})
+    cost_sub_js = json.dumps({k: round(v,2) for k,v in costo_pp_subco.items()})
+
+    title    = html.escape(nome_progetto or "Estimate")
+    start_s  = start_date.strftime("%d %b %Y")  if start_date  else ""
+    dead_s   = deadline_value.strftime("%d %b %Y") if deadline_value else ""
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root{{
+  --bg:#f6faf3;--card:#fff;--border:#e5eae2;--primary:#84cc16;--primary-d:#65a30d;
+  --fg:#1a2e05;--muted:#6b7a62;--accent:#ecfccb;--accent-fg:#3f6212;
+  --red:#ef4444;--pink:#ec4899;--blue:#2563eb;--amber:#d97706;--radius:10px;
+  --shadow:0 1px 3px rgba(0,0,0,.07);
+}}
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--fg);font-size:13px;line-height:1.5;letter-spacing:-.01em;padding:0 0 24px;}}
+/* ── HEADER ── */
+.hdr{{background:var(--fg);color:#fff;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;border-radius:0 0 var(--radius) var(--radius);}}
+.hdr-title{{font-size:16px;font-weight:800;letter-spacing:-.03em;}}
+.hdr-sub{{font-size:11px;color:rgba(255,255,255,.5);margin-top:2px;}}
+.badge{{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}}
+.badge-rate{{background:var(--primary);color:var(--fg);}}
+.badge-dates{{background:rgba(255,255,255,.12);color:rgba(255,255,255,.8);}}
+/* ── LAYOUT ── */
+.wrap{{max-width:1200px;margin:0 auto;padding:16px 16px 0;}}
+.sec{{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:20px 0 8px;}}
+/* ── KPIs ── */
+.kpis{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}}
+@media(max-width:800px){{.kpis{{grid-template-columns:repeat(2,1fr);}}}}
+.kpi{{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px 16px;position:relative;overflow:hidden;box-shadow:var(--shadow);}}
+.kpi::before{{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--ka,var(--primary));border-radius:var(--radius) var(--radius) 0 0;}}
+.kpi-lbl{{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}}
+.kpi-val{{font-size:1.7rem;font-weight:800;letter-spacing:-.04em;color:var(--fg);line-height:1.1;}}
+.kpi-sub{{font-size:11px;color:var(--muted);margin-top:5px;}}
+/* ── CARD ── */
+.card{{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}}
+.card-hdr{{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;}}
+.card-title{{font-size:13px;font-weight:700;color:var(--fg);}}
+.card-tag{{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}}
+/* ── CHARTS ── */
+.charts{{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:10px;margin-bottom:10px;}}
+@media(max-width:1000px){{.charts{{grid-template-columns:1fr 1fr;}}}}
+@media(max-width:640px){{.charts{{grid-template-columns:1fr;}}}}
+.cw{{position:relative;height:200px;}}
+/* ── COST BREAKDOWN ── */
+.cost-row{{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);}}
+.cost-row:last-child{{border-bottom:none;}}
+.cost-left{{display:flex;align-items:center;gap:7px;}}
+.dot{{width:9px;height:9px;border-radius:50%;flex-shrink:0;}}
+.cost-name{{font-size:12px;font-weight:500;}}
+.ctag{{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:999px;background:var(--accent);color:var(--accent-fg);}}
+.cost-right{{text-align:right;}}
+.cost-val{{font-size:13px;font-weight:700;}}
+.cost-pct{{font-size:10px;color:var(--muted);}}
+.cost-total{{display:flex;justify-content:space-between;align-items:center;padding-top:10px;margin-top:4px;border-top:2px solid var(--fg);}}
+.cost-total-lbl{{font-size:12px;font-weight:700;}}
+.cost-total-val{{font-size:18px;font-weight:800;letter-spacing:-.03em;}}
+/* ── TABLES ── */
+.bottom{{display:grid;grid-template-columns:1fr 1fr;gap:10px;}}
+@media(max-width:700px){{.bottom{{grid-template-columns:1fr;}}}}
+.tw{{overflow-x:auto;}}
+table{{width:100%;border-collapse:collapse;font-size:11.5px;}}
+thead th{{text-align:left;padding:7px 8px;border-bottom:2px solid var(--border);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);white-space:nowrap;cursor:pointer;user-select:none;}}
+thead th:hover{{color:var(--fg);}}
+tbody td{{padding:8px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}}
+tbody tr:last-child td{{border-bottom:none;}}
+tbody tr:hover{{background:var(--bg);}}
+.av{{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:8px;font-weight:800;color:#fff;flex-shrink:0;vertical-align:middle;margin-right:5px;}}
+.pill{{display:inline-flex;align-items:center;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}}
+.pill-i{{background:#f3f4f6;color:#6b7280;}}
+.pill-s{{background:var(--accent);color:var(--accent-fg);}}
+.pill-sub{{background:#fdf2f8;color:#be185d;border:1px solid #fbcfe8;}}
+.muted{{color:var(--muted);}}
+</style>
+</head>
+<body>
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--primary);margin-bottom:3px;">Accenture Song · AI_Team</div>
+    <div class="hdr-title">{title}</div>
+    <div class="hdr-sub">{start_s} → {dead_s} · {working_days} working days</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <span class="badge badge-rate">{rate_label}</span>
+    <span class="badge badge-dates">{start_s} → {dead_s}</span>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- KPIs -->
+<div class="sec">Key metrics</div>
+<div class="kpis">
+  <div class="kpi" style="--ka:#84cc16">
+    <div class="kpi-lbl">Elapsed MD</div>
+    <div class="kpi-val">{elapsed_h:.1f} h</div>
+    <div class="kpi-sub">{elapsed_h/8:.1f} person days</div>
+  </div>
+  <div class="kpi" style="--ka:#2563eb">
+    <div class="kpi-lbl">Estimated cost [{rate_label}]</div>
+    <div class="kpi-val">{html.escape(f"€ {costo_totale:,.0f}".replace(",","."))}</div>
+    <div class="kpi-sub">Internal + Subco + API</div>
+  </div>
+  <div class="kpi" style="--ka:#d97706">
+    <div class="kpi-lbl">Total effort</div>
+    <div class="kpi-val">{effort_h:.1f} h</div>
+    <div class="kpi-sub">{effort_h/8:.1f} effort days</div>
+  </div>
+  <div class="kpi" style="--ka:#8b5cf6">
+    <div class="kpi-lbl">Calendar duration</div>
+    <div class="kpi-val">{f"{cal_days} days" if cal_days else "—"}</div>
+    <div class="kpi-sub">based on assignments</div>
+  </div>
+</div>
+
+<!-- COST BREAKDOWN -->
+<div class="sec">Cost breakdown</div>
+<div class="card" style="margin-bottom:10px;">
+  <div class="card-hdr">
+    <div class="card-title">Job cost detail</div>
+    <div class="card-tag">{rate_label}</div>
+  </div>
+  <div class="cost-row">
+    <div class="cost-left"><div class="dot" style="background:#65a30d"></div><span class="cost-name">Internal team cost</span><span class="ctag">{rate_label}</span></div>
+    <div class="cost-right"><div class="cost-val">{html.escape(f"€ {int_total:,.0f}".replace(",","."))}</div><div class="cost-pct">{int(int_total/costo_totale*100) if costo_totale else 0}%</div></div>
+  </div>
+  <div class="cost-row">
+    <div class="cost-left"><div class="dot" style="background:#ec4899"></div><span class="cost-name">Subcontractor cost</span><span class="ctag">LCR</span></div>
+    <div class="cost-right"><div class="cost-val">{html.escape(f"€ {sub_total:,.0f}".replace(",","."))}</div><div class="cost-pct">{int(sub_total/costo_totale*100) if costo_totale else 0}%</div></div>
+  </div>
+  <div class="cost-row">
+    <div class="cost-left"><div class="dot" style="background:#2563eb"></div><span class="cost-name">Production cost (API · ×3 retry)</span><span class="ctag">LCR</span></div>
+    <div class="cost-right"><div class="cost-val">{html.escape(f"€ {prod_cost_total:,.0f}".replace(",","."))}</div><div class="cost-pct">{int(prod_cost_total/costo_totale*100) if costo_totale else 0}%</div></div>
+  </div>
+  <div class="cost-total">
+    <div class="cost-total-lbl">TOTAL JOB COST</div>
+    <div class="cost-total-val">{html.escape(f"€ {costo_totale:,.0f}".replace(",","."))}</div>
+  </div>
+</div>
+
+<!-- CHARTS -->
+<div class="sec">Analysis</div>
+<div class="charts">
+  <div class="card"><div class="card-hdr"><div class="card-title">Effort by phase</div><div class="card-tag" id="phase-tag"></div></div><div class="cw"><canvas id="ch-phase"></canvas></div></div>
+  <div class="card"><div class="card-hdr"><div class="card-title">Hours per person</div><div class="card-tag">h allocated</div></div><div class="cw"><canvas id="ch-persons"></canvas></div></div>
+  <div class="card"><div class="card-hdr"><div class="card-title">Cost split</div><div class="card-tag">by type</div></div><div class="cw"><canvas id="ch-split"></canvas></div></div>
+</div>
+
+<!-- TABLES -->
+<div class="sec">Detail tables</div>
+<div class="bottom">
+  <div class="card">
+    <div class="card-hdr"><div class="card-title">Breakdown by person</div><div class="card-tag" id="person-tag"></div></div>
+    <div class="tw"><table id="tbl-p"><thead><tr><th>Name</th><th>Type</th><th onclick="srt('tbl-p',2)">Hours ↕</th><th onclick="srt('tbl-p',3)">Days ↕</th><th onclick="srt('tbl-p',4)">Cost ↕</th></tr></thead><tbody></tbody></table></div>
+  </div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title">Breakdown by task</div><div class="card-tag" id="task-tag"></div></div>
+    <div class="tw"><table id="tbl-t"><thead><tr><th>Task</th><th>Phase</th><th onclick="srt('tbl-t',2)">Qty ↕</th><th onclick="srt('tbl-t',3)">Hours ↕</th><th onclick="srt('tbl-t',4)">API cost ↕</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+const PAL      = {PAL_JS};
+const PINK     = "{PINK_JS}";
+const TEAM     = {team_js};
+const SUBCOS   = {subco_js};
+const ORE_PP   = {ore_pp_js};
+const COST_INT = {cost_int_js};
+const COST_SUB = {cost_sub_js};
+const PHASES   = {phases_js};
+const TASKS    = {tasks_js};
+
+function ini(n){{const p=n.split(" ");return p.length>=2?(p[0][0]+p[p.length-1][0]).toUpperCase():n.slice(0,2).toUpperCase();}}
+function feur(v){{return "€ "+Math.round(v).toString().replace(/\\B(?=(\\d{{3}})+(?!\\d))/g,".");}}
+function fh(v){{return v.toFixed(1)+" h";}}
+
+function pcolor(name){{
+  const i=TEAM.findIndex(t=>t.name===name);
+  if(i>=0)return PAL[i%PAL.length];
+  const s=SUBCOS.findIndex(s=>s.name===name);
+  return s>=0?PINK:"#94a3b8";
+}}
+
+// ── Phase chart ──
+const phaseKeys=Object.keys(PHASES).sort((a,b)=>PHASES[b]-PHASES[a]);
+const phaseVals=phaseKeys.map(p=>+PHASES[p].toFixed(1));
+document.getElementById("phase-tag").textContent=phaseKeys.length+" phases";
+new Chart(document.getElementById("ch-phase"),{{
+  type:"bar",
+  data:{{labels:phaseKeys,datasets:[{{data:phaseVals,backgroundColor:phaseKeys.map((_,i)=>PAL[i%PAL.length]+"bb"),borderColor:phaseKeys.map((_,i)=>PAL[i%PAL.length]),borderWidth:1,borderRadius:4}}]}},
+  options:{{indexAxis:"y",responsive:true,maintainAspectRatio:false,
+    plugins:{{legend:{{display:false}},tooltip:{{callbacks:{{label:c=>fh(c.parsed.x)}}}}}},
+    scales:{{x:{{beginAtZero:true,ticks:{{callback:v=>v+"h"}},grid:{{color:"#f0f0f0"}}}},y:{{grid:{{display:false}},ticks:{{font:{{size:10}}}}}}}}
+  }}
+}});
+
+// ── Persons chart ──
+const pEntries=Object.entries(ORE_PP).sort((a,b)=>b[1]-a[1]);
+new Chart(document.getElementById("ch-persons"),{{
+  type:"bar",
+  data:{{labels:pEntries.map(p=>p[0].split(" ")[0]),datasets:[{{data:pEntries.map(p=>+p[1].toFixed(1)),backgroundColor:pEntries.map(p=>pcolor(p[0])+"bb"),borderColor:pEntries.map(p=>pcolor(p[0])),borderWidth:1,borderRadius:4}}]}},
+  options:{{responsive:true,maintainAspectRatio:false,
+    plugins:{{legend:{{display:false}},tooltip:{{callbacks:{{label:c=>fh(c.parsed.y)}}}}}},
+    scales:{{y:{{beginAtZero:true,ticks:{{callback:v=>v+"h"}},grid:{{color:"#f0f0f0"}}}},x:{{grid:{{display:false}},ticks:{{font:{{size:10}}}}}}}}
+  }}
+}});
+
+// ── Cost split donut ──
+const intT={int_total:.2f},subT={sub_total:.2f},prodT={prod_cost_total:.2f};
+new Chart(document.getElementById("ch-split"),{{
+  type:"doughnut",
+  data:{{labels:["Internal","Subcontractors","Production (API)"],datasets:[{{data:[intT,subT,prodT],backgroundColor:["#65a30dcc","#ec4899cc","#2563ebcc"],borderColor:"#fff",borderWidth:3}}]}},
+  options:{{responsive:true,maintainAspectRatio:false,cutout:"62%",
+    plugins:{{legend:{{position:"bottom",labels:{{usePointStyle:true,padding:12,font:{{size:10}}}}}},tooltip:{{callbacks:{{label:c=>`${{c.label}}: ${{feur(c.parsed)}}`}}}}}}
+  }}
+}});
+
+// ── Person table ──
+document.getElementById("person-tag").textContent=Object.keys(ORE_PP).length+" people";
+const tbody_p=document.querySelector("#tbl-p tbody");
+Object.entries(ORE_PP).sort((a,b)=>b[1]-a[1]).forEach(([name,h])=>{{
+  const t=TEAM.find(t=>t.name===name);
+  const isSub=SUBCOS.some(s=>s.name===name);
+  const isI=t&&t.type==="intern";
+  const col=pcolor(name);
+  const cost=(COST_INT[name]||0)+(COST_SUB[name]||0);
+  const typeHtml=isSub?'<span class="pill pill-sub">SUB</span>':isI?'<span class="pill pill-i">Intern</span>':'<span class="pill pill-s">Senior</span>';
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td><span class="av" style="background:${{col}}">${{ini(name)}}</span>${{name.split(" ")[0]}}</td><td>${{typeHtml}}</td><td>${{fh(h)}}</td><td>${{(h/8).toFixed(1)+" d"}}</td><td>${{cost>0?feur(cost):'<span class="muted">—</span>'}}</td>`;
+  tbody_p.appendChild(tr);
+}});
+
+// ── Task table ──
+document.getElementById("task-tag").textContent=TASKS.length+" tasks";
+const tbody_t=document.querySelector("#tbl-t tbody");
+const phaseColorMap={{}};
+[...new Set(TASKS.map(t=>t.phase))].forEach((p,i)=>phaseColorMap[p]=PAL[i%PAL.length]);
+TASKS.sort((a,b)=>b.real_h-a.real_h).forEach(t=>{{
+  const c=phaseColorMap[t.phase];
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td style="font-weight:600">${{t.name}}</td><td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${{c}};margin-right:4px;vertical-align:middle"></span>${{t.phase}}</td><td>${{t.qty}}</td><td>${{fh(t.real_h)}}</td><td>${{t.prod_c>0?feur(t.prod_c):'<span class="muted">—</span>'}}</td>`;
+  tbody_t.appendChild(tr);
+}});
+
+// ── Sort ──
+const _ss={{}};
+function srt(id,col){{
+  const tb=document.getElementById(id);
+  const rows=Array.from(tb.querySelectorAll("tbody tr"));
+  const k=id+col;_ss[k]=!_ss[k];
+  rows.sort((a,b)=>{{
+    const av=a.cells[col].textContent.trim().replace(/[€. ]/g,"");
+    const bv=b.cells[col].textContent.trim().replace(/[€. ]/g,"");
+    const an=parseFloat(av),bn=parseFloat(bv);
+    const c=isNaN(an)||isNaN(bn)?av.localeCompare(bv):an-bn;
+    return _ss[k]?c:-c;
+  }});
+  rows.forEach(r=>tb.querySelector("tbody").appendChild(r));
+}}
+</script>
+</body></html>"""
+
+
 # ── SIDEBAR ───────────────────────────────────────────────────
 with st.sidebar:
     st.title("AI Team Estimator")
@@ -1423,162 +1747,49 @@ with tab_job:
 
         rate_label = "LCR" if chargeable else "UCR (BD)"
 
-        # KPI bento row
-        st.markdown('<section class="bento-board">', unsafe_allow_html=True)
-        st.markdown(
-            (
-                '<div class="bento-kpis">'
-                f'{bento_kpi_html("Elapsed MD", fmt_hours(ore_reali_tot), f"{giorni_reali:.1f} person days")}'
-                f'{bento_kpi_html(f"Estimated cost [{rate_label}]", fmt_currency(costo_totale), "Internal + Subco + Production")}'
-                f'{bento_kpi_html("Total effort", fmt_hours(ore_effort_tot), f"{giorni_effort:.1f} effort days")}'
-                f'{bento_kpi_html("Calendar duration", fmt_workdays_ceil(giorni_cal) if giorni_cal else "—", "Based on current assignments")}'
-                '</div>'
-            ),
-            unsafe_allow_html=True,
+        # ── Embedded results dashboard ──
+        dash_html = build_results_html(
+            nome_progetto=nome_progetto,
+            start_date=start_date,
+            deadline_value=deadline_value,
+            working_days=days,
+            chargeable=chargeable,
+            job_items=job_items,
+            df_team=df_team,
+            subco_list=subco_list,
+            ore_pp=ore_pp,
+            costo_pp_internal=costo_pp_internal,
+            costo_pp_subco=costo_pp_subco,
+            prod_cost_total=prod_cost_total,
+            costo_totale=costo_totale,
+            giorni_cal=giorni_cal,
         )
+        components.html(dash_html, height=1080, scrolling=True)
 
-        # Cost breakdown card
-        st.markdown(
-            (
-                '<div class="cost-breakdown">'
-                '<div class="bento-card-hdr">'
-                '<div class="bento-card-title">Cost breakdown</div>'
-                f'<div class="bento-card-tag">{html.escape(rate_label)}</div>'
-                '</div>'
-                '<div class="cost-row">'
-                f'<span>Internal team cost <span class="cost-row-tag">{html.escape(rate_label)}</span></span>'
-                f'<strong>{html.escape(fmt_currency(internal_cost))}</strong>'
-                '</div>'
-                '<div class="cost-row">'
-                '<span>Subcontractor cost <span class="cost-row-tag">LCR</span></span>'
-                f'<strong>{html.escape(fmt_currency(subco_cost))}</strong>'
-                '</div>'
-                '<div class="cost-row">'
-                f'<span>Production cost (API) <span class="cost-row-tag">LCR</span></span>'
-                f'<strong>{html.escape(fmt_currency(prod_cost_total))}</strong>'
-                '</div>'
-                '<div class="cost-divider"></div>'
-                '<div class="cost-total">'
-                '<span>TOTAL JOB COST</span>'
-                f'<span>{html.escape(fmt_currency(costo_totale))}</span>'
-                '</div>'
-                '</div>'
-            ),
-            unsafe_allow_html=True,
-        )
-
-        st.markdown('<div class="bento-row2">', unsafe_allow_html=True)
-
-        c_left, c_right = st.columns([1.55, 1.0])
-        with c_left:
-            phase_meta = f"{len(phase_df)} phases" if not phase_df.empty else "No phase data"
-            st.markdown(
-                (
-                    '<div class="bento-card">'
-                    '<div class="bento-card-hdr">'
-                    '<div class="bento-card-title">Effort distribution by phase</div>'
-                    f'<div class="bento-card-tag">{html.escape(phase_meta)}</div>'
-                    '</div>'
-                    f'{phase_bars_html(phase_df)}'
-                    '</div>'
-                ),
-                unsafe_allow_html=True,
-            )
-
-        with c_right:
-            st.markdown(
-                (
-                    '<div class="bento-card">'
-                    '<div class="bento-card-hdr">'
-                    '<div class="bento-card-title">Plan within deadline</div>'
-                    '<div class="bento-card-tag">Capacity check</div>'
-                    '</div>'
-                ),
-                unsafe_allow_html=True,
-            )
-            if days <= 0:
+        # ── Capacity check ──
+        if days > 0:
+            with st.expander("Capacity check"):
                 st.markdown(
-                    '<p class="bento-plan-stat">Set a valid <strong>start date</strong> and <strong>deadline</strong>.</p>',
-                    unsafe_allow_html=True,
+                    f"**Window:** {days} working days · "
+                    f"**Team capacity:** {daily_capacity:.1f} h/day · "
+                    f"**Required:** {required_per_day:.1f} h/day"
                 )
-            else:
-                st.markdown(
-                    (
-                        f'<p class="bento-plan-stat">Window: <strong>{days} working days</strong></p>'
-                        f'<p class="bento-plan-stat">Team capacity: <strong>{daily_capacity:.1f} h/day</strong></p>'
-                        f'<p class="bento-plan-stat">Required effort: <strong>{required_per_day:.1f} h/day</strong></p>'
-                    ),
-                    unsafe_allow_html=True,
-                )
-
-            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-            if st.button("Calculate plan", use_container_width=True):
-                if daily_capacity <= 0:
-                    st.warning("Team capacity is zero. Check availability / Team on job.")
-                elif days <= 0:
-                    st.warning("The time window is not valid.")
+                gap = ore_effort_tot - (daily_capacity * days)
+                if gap <= 0:
+                    st.success("The team can meet the deadline based on current effort.")
                 else:
-                    gap = ore_effort_tot - (daily_capacity * days)
-                    if gap <= 0:
-                        st.success("The team can meet the deadline based on current effort.")
-                    else:
-                        avg_person_day = ORE_GIORNATA if scope_people else 0
-                        extra_people = int((gap / (avg_person_day * days)) + 0.999) if avg_person_day > 0 else None
-                        st.warning(f"More capacity needed: ~**{gap:.1f} h** missing by deadline.")
-                        if extra_people is not None:
-                            st.caption(f"Estimate: add ~**{extra_people}** people (average capacity) or increase availability.")
-            st.markdown('</div>', unsafe_allow_html=True)
+                    avg_person_day = ORE_GIORNATA if scope_people else 0
+                    extra_people = int((gap / (avg_person_day * days)) + 0.999) if avg_person_day > 0 else None
+                    st.warning(f"More capacity needed: ~**{gap:.1f} h** missing by deadline.")
+                    if extra_people is not None:
+                        st.caption(f"Estimate: add ~**{extra_people}** people or increase availability.")
 
-        st.markdown('</div></section>', unsafe_allow_html=True)
-
-        # ── Breakdown by person ──
-        all_assigned = sorted(ore_pp.keys())
-        with st.expander("Breakdown by person"):
-            bp_rows = []
-            for n in all_assigned:
-                is_subco = n in subco_names
-                is_intern = False
-                ruolo = ""
-                if not is_subco and has_ruolo and not df_team.empty:
-                    match = df_team.loc[df_team["nome"] == n, "ruolo"]
-                    if not match.empty:
-                        ruolo = str(match.iloc[0])
-                        is_intern = ruolo == "Intern"
-                cost_val = costo_pp_internal.get(n, 0) + costo_pp_subco.get(n, 0)
-                bp_rows.append({
-                    "Name": n,
-                    "Type": "SUB" if is_subco else ("Intern" if is_intern else "Internal"),
-                    "Role": ruolo if not is_subco else next((s.get("ruolo","") for s in subco_list if s["nome"]==n), ""),
-                    "Rate": "LCR" if is_subco else ("—" if is_intern else rate_label),
-                    "Hours": round(ore_pp[n], 1),
-                    "Days": round(ore_pp[n] / ORE_GIORNATA, 1),
-                    "Cost": f"€ {cost_val:,.0f}" if cost_val > 0 else "—",
-                })
-            st.dataframe(pd.DataFrame(bp_rows), hide_index=True, use_container_width=True)
-
-        # ── Breakdown by task ──
-        with st.expander("Breakdown by task"):
-            bt_rows = []
-            for it in job_items:
-                row_d = {
-                    "Task": it["nome"],
-                    "Qty": it["quantita"],
-                    "Units/hr": it["uph"],
-                    "Base hrs": round(it["quantita"] / it["uph"], 1),
-                    "Working days": round(it["quantita"] / it["uph"] / max(len(it["assigned"]), 1) / ORE_GIORNATA, 1),
-                    "Assigned to": ", ".join(it["assigned"]),
-                }
-                if it.get("prod_cost", 0) > 0:
-                    row_d["Prod cost (API)"] = f"€ {it['prod_cost']:,.2f} (×{RETRY_MULTIPLIER} retry)"
-                bt_rows.append(row_d)
-            st.dataframe(pd.DataFrame(bt_rows), hide_index=True, use_container_width=True)
-
+        # ── Export ──
         st.divider()
-        all_ore_pp = dict(ore_pp)
         excel_b = build_export_excel(
             nome_progetto or "Estimate",
             job_items,
-            all_ore_pp,
+            dict(ore_pp),
             costo_pp_internal,
             costo_pp_subco,
             costo_pp_prod,
