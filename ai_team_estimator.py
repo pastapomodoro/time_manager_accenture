@@ -1379,6 +1379,25 @@ function recomputeMarkup(){{
   document.getElementById('grand-total-val').textContent = feur(base + extra);
 }}
 
+// ── Print: freeze canvases as images ──
+window.addEventListener('beforeprint', ()=>{{
+  document.querySelectorAll('canvas').forEach(c=>{{
+    const img = document.createElement('img');
+    img.src = c.toDataURL('image/png');
+    img.style.width  = c.offsetWidth  + 'px';
+    img.style.height = c.offsetHeight + 'px';
+    img.dataset.printProxy = '1';
+    c.parentNode.insertBefore(img, c);
+    c.style.display = 'none';
+  }});
+}});
+window.addEventListener('afterprint', ()=>{{
+  document.querySelectorAll('img[data-print-proxy]').forEach(i=>{{
+    i.previousSibling && (i.previousSibling.style.display = '');
+    i.remove();
+  }});
+}});
+
 // ── Init ──
 setMode({init_lcr_js});
 </script>
