@@ -905,14 +905,21 @@ def load_team_from_excel(file_bytes: bytes) -> list[dict]:
     return df.to_dict("records")
 
 def get_team_df() -> pd.DataFrame:
-    """Priority: profiles.json > Excel."""
+    """Priority: profiles.json > Excel. Always normalises costo_lcr/costo_ucr."""
     profiles = load_profiles()
     if profiles is not None:
-        return pd.DataFrame(profiles)
-    if file_bytes:
-        records = load_team_from_excel(file_bytes)
-        return pd.DataFrame(records)
-    return pd.DataFrame()
+        df = pd.DataFrame(profiles)
+    elif file_bytes:
+        df = pd.DataFrame(load_team_from_excel(file_bytes))
+    else:
+        return pd.DataFrame()
+    if "costo_lcr" not in df.columns:
+        df["costo_lcr"] = pd.to_numeric(df.get("costo_orario", 0), errors="coerce").fillna(0)
+    if "costo_ucr" not in df.columns:
+        df["costo_ucr"] = 0.0
+    df["costo_lcr"] = pd.to_numeric(df["costo_lcr"], errors="coerce").fillna(0)
+    df["costo_ucr"] = pd.to_numeric(df["costo_ucr"], errors="coerce").fillna(0)
+    return df
 
 
 # ── EXPORT ────────────────────────────────────────────────────
