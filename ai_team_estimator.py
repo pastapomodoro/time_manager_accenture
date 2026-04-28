@@ -492,23 +492,18 @@ hr { border-color: var(--border) !important; }
 .status-label svg { flex-shrink: 0; }
 </style>
 <script>
-(function(){
-  function colorTags(){
-    document.querySelectorAll('[data-baseweb="tag"]').forEach(tag=>{
-      const txt = tag.textContent || '';
-      if(txt.includes('(SUB)')){
-        tag.style.background='#fce7f3';
-        tag.style.color='#9d174d';
-      } else {
-        tag.style.background='#dcfce7';
-        tag.style.color='#166534';
-      }
-    });
-  }
-  const obs = new MutationObserver(colorTags);
-  obs.observe(document.body, {childList:true, subtree:true});
-  colorTags();
-})();
+setInterval(function(){
+  document.querySelectorAll('[data-baseweb="tag"]').forEach(function(tag){
+    var txt = tag.innerText || '';
+    if(txt.includes('(SUB)')){
+      tag.style.setProperty('background','#fce7f3','important');
+      tag.style.setProperty('color','#9d174d','important');
+    } else {
+      tag.style.setProperty('background','#dcfce7','important');
+      tag.style.setProperty('color','#166534','important');
+    }
+  });
+}, 300);
 </script>
 """, unsafe_allow_html=True)
 
