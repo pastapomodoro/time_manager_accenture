@@ -13,7 +13,8 @@ try:
     from db import (is_supabase_configured, sign_in, sign_up, sign_out,
                     load_profiles_db, save_profiles_db,
                     load_presets_db, save_preset_db, delete_preset_db,
-                    load_xlsx_from_storage, upload_xlsx_to_storage)
+                    load_xlsx_from_storage, upload_xlsx_to_storage,
+                    save_session_tokens, clear_saved_session, restore_saved_session)
     _HAS_SUPABASE = True
 except ImportError:
     _HAS_SUPABASE = False
@@ -27,6 +28,13 @@ st.set_page_config(page_title="AI Team Estimator", layout="wide")
 if _USE_SUPABASE:
     if "sb_session" not in st.session_state:
         st.session_state.sb_session = None
+    if "remember_me" not in st.session_state:
+        st.session_state.remember_me = True
+    if st.session_state.sb_session is None:
+        restored_session = restore_saved_session()
+        if restored_session is not None:
+            st.session_state.sb_session = restored_session
+            st.rerun()
     if st.session_state.sb_session is None:
         st.markdown("""
         <style>
@@ -137,7 +145,10 @@ if _USE_SUPABASE:
           border-color: oklch(0.8871 0.2122 128.5041) !important;
           box-shadow: 0 0 0 3px oklch(0.8871 0.2122 128.5041 / .2) !important;
         }
-        div[data-testid="stForm"] label { display: none !important; }
+        div[data-testid="stForm"] [data-testid="stTextInput"] label,
+        div[data-testid="stForm"] [data-testid="stTextInputRootElement"] label {
+          display: none !important;
+        }
 
         /* card title */
         div[data-testid="stForm"] strong { color: oklch(0.2077 0.0398 265.7549) !important; font-size: 1.05rem !important; }
@@ -179,10 +190,16 @@ if _USE_SUPABASE:
                 st.markdown("**Accedi al tuo account**")
                 email = st.text_input("Email", placeholder="nome@accenture.com", label_visibility="collapsed")
                 pwd   = st.text_input("Password", type="password", placeholder="Password", label_visibility="collapsed")
+                remember_me = st.checkbox("Remember me", value=st.session_state.remember_me)
                 if st.form_submit_button("Accedi", use_container_width=True):
                     try:
                         res = sign_in(email, pwd)
                         st.session_state.sb_session = res.session
+                        st.session_state.remember_me = remember_me
+                        if remember_me:
+                            save_session_tokens(res.session)
+                        else:
+                            clear_saved_session()
                         st.rerun()
                     except Exception:
                         st.error("Credenziali non valide")
@@ -254,6 +271,10 @@ st.markdown("""
   --accent-fg:   oklch(0.4479 0.1083 151.3277);
   --border:      oklch(0.9288 0.0126 255.5078);
   --destructive: oklch(0.6368 0.2078 25.3313);
+  --primary-hover: oklch(0.82 0.20 128.5);
+  --focus-ring: oklch(0.8871 0.2122 128.5041 / 0.25);
+  --success:     oklch(0.723 0.192 149.579);
+  --empty:       oklch(0.74 0.02 250);
   --radius:      1rem;
 }
 
@@ -294,7 +315,7 @@ h1,h2,h3,h4 { color: var(--fg) !important; font-family: Inter, sans-serif !impor
   border-color: var(--primary) !important;
 }
 .stButton > button[kind="primary"]:hover {
-  background: oklch(0.82 0.20 128.5) !important;
+  background: var(--primary-hover) !important;
 }
 
 /* ── INPUTS ──────────────────────────────────────────────── */
@@ -305,9 +326,21 @@ h1,h2,h3,h4 { color: var(--fg) !important; font-family: Inter, sans-serif !impor
   color: var(--fg) !important;
   font-family: Inter, sans-serif !important;
 }
+.stNumberInput button {
+  display: none !important;
+}
+.stNumberInput input[type="number"]::-webkit-outer-spin-button,
+.stNumberInput input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.stNumberInput input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
 .stTextInput input:focus, .stNumberInput input:focus {
   border-color: var(--primary) !important;
-  box-shadow: 0 0 0 2px oklch(0.8871 0.2122 128.5041 / 0.25) !important;
+  box-shadow: 0 0 0 2px var(--focus-ring) !important;
 }
 [data-baseweb="select"] > div {
   background: var(--card) !important;
@@ -377,6 +410,47 @@ hr { border-color: var(--border) !important; }
   background:var(--card);border:1px solid var(--border);
   border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;
 }
+.job-settings-card{
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card) 92%, var(--accent) 8%) 0%, var(--card) 100%);
+  border:1px solid var(--border);
+  border-radius:calc(var(--radius) - 2px);
+  padding:12px 14px;
+  margin:8px 0 10px 0;
+}
+.job-settings-label{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:var(--muted-fg);
+  font-weight:700;
+  margin-bottom:4px;
+}
+.job-settings-value{
+  font-size:14px;
+  color:var(--fg);
+  font-weight:600;
+}
+.job-settings-subtle{
+  font-size:12px;
+  color:var(--muted-fg);
+}
+.compact-avatar-row{
+  display:flex;
+  align-items:center;
+  gap:0;
+  min-height:32px;
+}
+.compact-avatar-row .avatar{
+  margin-right:-8px;
+  border:2px solid var(--card);
+  box-shadow:0 1px 2px hsl(0 0% 0% / 0.06);
+}
+.avatar-count{
+  margin-left:12px;
+  font-size:12px;
+  color:var(--muted-fg);
+  font-weight:600;
+}
 .sec-hdr{
   display:flex;align-items:center;gap:8px;font-size:1.1rem;
   font-weight:700;margin:12px 0 4px 0;color:var(--fg);
@@ -396,7 +470,7 @@ def _ico(path: str, size: int = 16, color: str = "currentColor") -> str:
 ICO_CLIP   = _ico('<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>')
 ICO_USERS  = _ico('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')
 ICO_DL     = _ico('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>')
-ICO_CHECK  = _ico('<polyline points="20 6 9 17 4 12"/>', color="#16a34a")
+ICO_CHECK  = _ico('<polyline points="20 6 9 17 4 12"/>', color="var(--success)")
 ICO_FILE   = _ico('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>')
 ICO_WRENCH = _ico('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>')
 
@@ -412,8 +486,18 @@ def avatar_html(name: str, color: str, size: int = 32) -> str:
 
 def avatars_html(names, color_map) -> str:
     if not names:
-        return '<span style="color:#bbb;font-size:13px;">—</span>'
+        return '<span style="color:var(--empty);font-size:13px;">—</span>'
     return '<div class="avatar-row">' + "".join(avatar_html(n, color_map[n]) for n in names) + "</div>"
+
+
+def compact_avatars_html(names, color_map, max_visible: int = 5) -> str:
+    if not names:
+        return '<span class="job-settings-subtle">Nessuna persona selezionata</span>'
+    visible = names[:max_visible]
+    extra = len(names) - len(visible)
+    avatars = "".join(avatar_html(n, color_map[n], size=28) for n in visible)
+    extra_html = f'<span class="avatar-count">+{extra}</span>' if extra > 0 else ""
+    return f'<div class="compact-avatar-row">{avatars}{extra_html}</div>'
 
 
 # ── STORAGE ───────────────────────────────────────────────────
@@ -428,15 +512,122 @@ def save_presets(p: dict):
 
 def load_profiles() -> list[dict] | None:
     if _USE_SUPABASE:
-        data = load_profiles_db()
-        return data if data else None
+        try:
+            data = load_profiles_db()
+            return data if data else None
+        except Exception:
+            return json.load(open(PROFILES_FILE)) if os.path.exists(PROFILES_FILE) else None
     return json.load(open(PROFILES_FILE)) if os.path.exists(PROFILES_FILE) else None
 
 def save_profiles(profiles: list[dict]):
     if _USE_SUPABASE:
-        save_profiles_db(profiles)
-    else:
-        json.dump(profiles, open(PROFILES_FILE, "w"), indent=2, ensure_ascii=False)
+        try:
+            save_profiles_db(profiles)
+            return
+        except Exception:
+            pass
+    json.dump(profiles, open(PROFILES_FILE, "w"), indent=2, ensure_ascii=False)
+
+
+def clean_float(value, default: float = 0.0) -> float:
+    num = pd.to_numeric(value, errors="coerce")
+    return float(default if pd.isna(num) else num)
+
+
+def clean_int(value, default: int = 0) -> int:
+    num = pd.to_numeric(value, errors="coerce")
+    return int(default if pd.isna(num) else num)
+
+
+def editor_height(row_count: int, *, min_rows: int = 1, row_px: int = 35, chrome_px: int = 140) -> int:
+    visible_rows = max(row_count, min_rows)
+    return chrome_px + row_px * visible_rows
+
+
+def parse_assigned_people(value: str, valid_names: list[str]) -> list[str]:
+    return [
+        person for person in [p.strip() for p in str(value or "").split(",")]
+        if person and person in valid_names
+    ]
+
+
+def preset_to_editor_rows(preset_data: dict, df_lav: pd.DataFrame) -> list[dict]:
+    """Normalizza preset legacy e nuovi preset tabellari verso il formato dell'editor."""
+    if not preset_data:
+        return []
+
+    if isinstance(preset_data.get("rows"), list):
+        return preset_data["rows"]
+
+    meta_map = (
+        df_lav[["nome_lavorazione", "sottocategoria", "skill_richiesta", "minuti_per_unita"]]
+        .drop_duplicates(subset=["nome_lavorazione"])
+        .set_index("nome_lavorazione")
+        .to_dict("index")
+    )
+
+    rows: list[dict] = []
+    for nome, values in preset_data.items():
+        meta = meta_map.get(nome, {})
+        rows.append({
+            "sottocategoria": meta.get("sottocategoria", "CUSTOM"),
+            "nome_lavorazione": nome,
+            "skill_richiesta": meta.get("skill_richiesta", ""),
+            "unita_ora": clean_float(values.get("uph", 0)),
+            "quantita": clean_int(values.get("qty", 0)),
+            "assegnato_a": ", ".join(values.get("assigned", [])),
+        })
+    return rows
+
+
+def preset_to_meta(preset_data: dict) -> dict:
+    if not preset_data or "meta" not in preset_data:
+        return {}
+    return preset_data.get("meta", {}) or {}
+
+
+def build_editor_rows(df_lav: pd.DataFrame, preset_rows: list[dict]) -> pd.DataFrame:
+    """Crea la tabella stile Excel unendo catalogo base e righe custom del preset."""
+    base_rows = [
+        {
+            "sottocategoria": row["sottocategoria"],
+            "nome_lavorazione": row["nome_lavorazione"],
+            "skill_richiesta": row["skill_richiesta"],
+            "unita_ora": round(60 / row["minuti_per_unita"], 1),
+            "quantita": 0,
+            "assegnato_a": "",
+        }
+        for _, row in df_lav.iterrows()
+    ]
+
+    base_by_name = {row["nome_lavorazione"]: row for row in base_rows}
+    merged_rows: list[dict] = []
+    used_names: set[str] = set()
+
+    for preset_row in preset_rows:
+        nome = str(preset_row.get("nome_lavorazione", "")).strip()
+        if not nome:
+            continue
+        row = dict(base_by_name.get(nome, {}))
+        row.update({
+            "sottocategoria": str(preset_row.get("sottocategoria", row.get("sottocategoria", "CUSTOM"))).strip() or "CUSTOM",
+            "nome_lavorazione": nome,
+            "skill_richiesta": str(preset_row.get("skill_richiesta", row.get("skill_richiesta", ""))).strip(),
+            "unita_ora": clean_float(preset_row.get("unita_ora", row.get("unita_ora", 0))),
+            "quantita": clean_int(preset_row.get("quantita", row.get("quantita", 0))),
+            "assegnato_a": str(preset_row.get("assegnato_a", row.get("assegnato_a", ""))).strip(),
+        })
+        merged_rows.append(row)
+        used_names.add(nome)
+
+    for row in base_rows:
+        if row["nome_lavorazione"] not in used_names:
+            merged_rows.append(row)
+
+    return pd.DataFrame(
+        merged_rows,
+        columns=["sottocategoria", "nome_lavorazione", "skill_richiesta", "unita_ora", "quantita", "assegnato_a"],
+    )
 
 
 # ── LOADER ────────────────────────────────────────────────────
@@ -611,9 +802,12 @@ with tab_job:
 
     if "preset_data" not in st.session_state:
         st.session_state.preset_data = {}
+    if "job_editor_version" not in st.session_state:
+        st.session_state.job_editor_version = 0
     if load_clicked and preset_sel != "— nessuno —":
         st.session_state.preset_data = presets[preset_sel]
         st.session_state.preset_sel = preset_sel
+        st.session_state.job_editor_version += 1
         st.toast(f"Preset «{preset_sel}» caricato")
         st.rerun()
     if del_clicked and preset_sel != "— nessuno —":
@@ -622,52 +816,137 @@ with tab_job:
         else:
             del presets[preset_sel]; save_presets(presets)
         st.session_state.preset_sel = "— nessuno —"
+        st.session_state.preset_data = {}
+        st.session_state.job_editor_version += 1
         st.toast(f"Preset «{preset_sel}» eliminato")
         st.rerun()
     pd_data = st.session_state.preset_data
+    preset_meta = preset_to_meta(pd_data)
+    team_scope_default = [
+        n for n in preset_meta.get("team_scope", tutti_nomi)
+        if n in tutti_nomi
+    ] or tutti_nomi
+    deadline_default = (
+        pd.to_datetime(preset_meta.get("deadline")).date()
+        if preset_meta.get("deadline")
+        else datetime.now().date()
+    )
+
+    summary_a, summary_b, summary_c = st.columns([1.2, 2.2, 0.8])
+    with summary_c:
+        with st.expander("Modifica", expanded=False):
+            deadline_value = st.date_input("Deadline", value=deadline_default)
+            team_scope = st.multiselect(
+                "Chi lavorera sul job",
+                options=tutti_nomi,
+                default=team_scope_default,
+                format_func=lambda n: f"{initials(n)}  {n}",
+                placeholder="Seleziona il team del job...",
+                help="Se non selezioni nessuno, il job usa tutto il team.",
+            )
+    if "deadline_value" not in locals():
+        deadline_value = deadline_default
+    if "team_scope" not in locals():
+        team_scope = team_scope_default
+    display_team_scope = team_scope or tutti_nomi
+    with summary_a:
+        st.markdown(
+            f"""
+            <div class="job-settings-card">
+              <div class="job-settings-label">Deadline</div>
+              <div class="job-settings-value">{deadline_value.strftime('%d/%m/%Y')}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with summary_b:
+        st.markdown(
+            f"""
+            <div class="job-settings-card">
+              <div class="job-settings-label">Team sul job</div>
+              {compact_avatars_html(display_team_scope, color_map)}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    nomi_disponibili_job = team_scope or tutti_nomi
 
     st.divider()
     st.markdown(f'<div class="sec-hdr">{ICO_CLIP} Lavorazioni</div>', unsafe_allow_html=True)
-    st.caption("Imposta unità/ora, quantità e persone per ogni lavorazione del job.")
+    st.caption("Sezione unica modificabile: se aggiorni l'Excel, le lavorazioni qui si sincronizzano automaticamente al reload.")
 
-    hcols = st.columns([3, 1.2, 1, 3, 1.8])
-    for col, lbl in zip(hcols, ["Lavorazione","Unità/ora","Quantità","Assegnato a",""]):
-        col.markdown(f"<span style='font-size:12px;font-weight:700;color:#888'>{lbl}</span>",
-                     unsafe_allow_html=True)
-    st.markdown("<hr style='margin:4px 0 8px 0'>", unsafe_allow_html=True)
+    preset_rows = preset_to_editor_rows(pd_data, df_lav)
+    active_rows = build_editor_rows(df_lav, preset_rows)
+    active_rows = active_rows[
+        active_rows["nome_lavorazione"].fillna("").astype(str).str.strip() != ""
+    ].reset_index(drop=True)
+
+    if not active_rows.empty:
+        h1, h2, h3, h4 = st.columns([3.4, 1.7, 1.8, 4.1])
+        h1.markdown("`Lavorazione`")
+        h2.markdown("`Quantità`")
+        h3.markdown("`Unità/ora`")
+        h4.markdown("`Assegnato a`")
+
+        for row_idx, row in active_rows.iterrows():
+            current_names = parse_assigned_people(row.get("assegnato_a", ""), nomi_disponibili_job)
+            c1, c2, c3, c4 = st.columns([3.4, 1.7, 1.8, 4.1])
+
+            nome = c1.text_input(
+                "Lavorazione",
+                value=str(row["nome_lavorazione"]),
+                key=f"job_name_{st.session_state.job_editor_version}_{row_idx}",
+                label_visibility="collapsed",
+            )
+            qty = c2.number_input(
+                "Quantità",
+                min_value=0,
+                step=1,
+                value=int(row["quantita"]),
+                key=f"job_qty_{st.session_state.job_editor_version}_{row_idx}",
+                label_visibility="collapsed",
+            )
+            uph = c3.number_input(
+                "Unità/ora",
+                min_value=0.1,
+                step=0.1,
+                value=float(row["unita_ora"]),
+                key=f"job_uph_{st.session_state.job_editor_version}_{row_idx}",
+                label_visibility="collapsed",
+            )
+            selected_names = c4.multiselect(
+                "Assegnato a",
+                options=nomi_disponibili_job,
+                default=current_names,
+                format_func=lambda n: f"{initials(n)}  {n}",
+                key=f"assign_{st.session_state.job_editor_version}_{row_idx}",
+                placeholder="Seleziona una o piu persone...",
+                label_visibility="collapsed",
+            )
+
+            active_rows.at[row_idx, "nome_lavorazione"] = nome.strip()
+            active_rows.at[row_idx, "quantita"] = int(qty)
+            active_rows.at[row_idx, "unita_ora"] = float(uph)
+            active_rows.at[row_idx, "assegnato_a"] = ", ".join(selected_names)
 
     job_items = []
-    for gruppo_nome, gruppo_df in df_lav.groupby("sottocategoria", sort=False):
-        st.markdown(f'<div class="group-hdr">{gruppo_nome}</div>', unsafe_allow_html=True)
-        for i, lav in gruppo_df.iterrows():
-            p   = pd_data.get(lav["nome_lavorazione"], {})
-            uph_def = round(60 / lav["minuti_per_unita"], 1)
-            cn, cm, cq, ct, ca = st.columns([3, 1.2, 1, 3, 1.8])
-            with cn:
-                st.markdown(f'<div class="task-name">{lav["nome_lavorazione"]}</div>',
-                            unsafe_allow_html=True)
-            with cm:
-                uph = st.number_input("u", min_value=0.1, step=0.5,
-                                      value=float(p.get("uph", uph_def)),
-                                      key=f"uph_{i}", label_visibility="collapsed",
-                                      help=f"Default: {uph_def} unità/ora")
-            with cq:
-                qty = st.number_input("q", min_value=0, step=1,
-                                      value=int(p.get("qty", 0)),
-                                      key=f"qty_{i}", label_visibility="collapsed")
-            with ct:
-                assigned = st.multiselect("p", options=tutti_nomi,
-                                          default=[n for n in p.get("assigned",[]) if n in tutti_nomi],
-                                          format_func=lambda n: f"{initials(n)}  {n}",
-                                          key=f"team_{i}", label_visibility="collapsed",
-                                          placeholder="Assegna persone…")
-            with ca:
-                st.markdown(avatars_html(assigned, color_map), unsafe_allow_html=True)
+    for _, row in active_rows.iterrows():
+        nome = str(row.get("nome_lavorazione", "")).strip()
+        if not nome:
+            continue
 
-            if qty > 0 and assigned:
-                job_items.append({"nome": lav["nome_lavorazione"], "uph": float(uph),
-                                   "skill": lav["skill_richiesta"],
-                                   "quantita": int(qty), "assigned": assigned})
+        uph = clean_float(row.get("unita_ora"))
+        qty = clean_int(row.get("quantita"))
+        assigned = parse_assigned_people(row.get("assegnato_a", ""), nomi_disponibili_job)
+
+        if qty > 0 and assigned and uph > 0:
+            job_items.append({
+                "nome": nome,
+                "uph": uph,
+                "skill": str(row.get("skill_richiesta", "")).strip(),
+                "quantita": qty,
+                "assigned": assigned,
+            })
 
     # Salva preset
     with st.expander("Salva come preset"):
@@ -677,11 +956,29 @@ with tab_job:
         if sc[1].button("Salva", use_container_width=True):
             if not pname.strip():
                 st.warning("Inserisci un nome")
-            elif not job_items:
-                st.warning("Nessuna lavorazione compilata")
+            elif active_rows.empty:
+                st.warning("Nessuna lavorazione da salvare")
             else:
-                snap = {it["nome"]: {"uph":it["uph"],"qty":it["quantita"],"assigned":it["assigned"]}
-                        for it in job_items}
+                snap_rows = []
+                for _, row in active_rows.iterrows():
+                    nome = str(row["nome_lavorazione"]).strip()
+                    if not nome:
+                        continue
+                    snap_rows.append({
+                        "sottocategoria": str(row.get("sottocategoria", "")).strip() or "CUSTOM",
+                        "nome_lavorazione": nome,
+                        "skill_richiesta": str(row.get("skill_richiesta", "")).strip(),
+                        "unita_ora": clean_float(row.get("unita_ora", 0)),
+                        "quantita": clean_int(row.get("quantita", 0)),
+                        "assegnato_a": str(row.get("assegnato_a", "")).strip(),
+                    })
+                snap = {
+                    "meta": {
+                        "deadline": deadline_value.isoformat(),
+                        "team_scope": team_scope,
+                    },
+                    "rows": snap_rows,
+                }
                 if _USE_SUPABASE:
                     save_preset_db(pname.strip(), snap)
                 else:
@@ -692,6 +989,7 @@ with tab_job:
     st.divider()
     label = f"Risultati{' — ' + nome_progetto if nome_progetto else ''}"
     st.markdown(f'<div class="sec-hdr" style="font-size:1.3rem">{ICO_FILE} {label}</div>', unsafe_allow_html=True)
+    st.caption(f"Deadline: {deadline_value.strftime('%d/%m/%Y')} • Team selezionato: {len(nomi_disponibili_job)} persone")
 
     if not job_items:
         st.info("Inserisci almeno una quantità e assegna una persona per vedere la stima.")
@@ -775,7 +1073,7 @@ with tab_profili:
         if col not in df_prof.columns:
             df_prof[col] = ""
 
-    st.markdown(f'<div class="sec-hdr" style="font-size:0.95rem;font-weight:600;color:#374151">{ICO_WRENCH} Membri del team</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sec-hdr" style="font-size:0.95rem;font-weight:600;color:var(--fg)">{ICO_WRENCH} Membri del team</div>', unsafe_allow_html=True)
 
     edited_prof = st.data_editor(
         df_prof[["nome","ruolo","seniority","costo_orario","skill_tags","disponibilita_h_settimana"]],
@@ -796,7 +1094,7 @@ with tab_profili:
         num_rows="dynamic",
         hide_index=True,
         use_container_width=True,
-        height=60 + 38 * max(len(df_prof), 1),
+        height=editor_height(len(df_prof), min_rows=3, row_px=38, chrome_px=90),
         key="prof_editor",
     )
 
@@ -814,7 +1112,7 @@ with tab_profili:
                 f'background:oklch(0.9819 0.0181 155.8263);border-radius:20px;padding:4px 10px 4px 4px;margin:3px;">'
                 f'{avatar_html(row["nome"], color, size=26)}'
                 f'<span style="font-size:13px;font-weight:500">{full}</span>'
-                f'<span style="font-size:11px;color:#888">{ruolo}</span>'
+                f'<span style="font-size:11px;color:var(--muted-fg)">{ruolo}</span>'
                 f'</div>'
             )
         st.markdown(f'<div style="display:flex;flex-wrap:wrap;gap:2px">{chips}</div>', unsafe_allow_html=True)

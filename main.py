@@ -23,34 +23,34 @@ def root() -> str:
       margin: 0 auto;
       padding: 2.5rem 1.25rem 3rem;
       line-height: 1.6;
-      color: #1E1535;
-      background: linear-gradient(180deg, #FAF8FF 0%, #F5F0FF 100%);
+      color: #1A2E05;
+      background: linear-gradient(180deg, #F7FEE7 0%, #ECFCCB 100%);
       min-height: 100vh;
     }}
     h1 {{
       font-weight: 600;
       letter-spacing: -0.03em;
-      color: #2E1065;
+      color: #3F6212;
       margin: 0 0 0.5rem;
       font-size: 1.65rem;
     }}
-    p {{ margin: 0.85rem 0; color: #3D3558; }}
+    p {{ margin: 0.85rem 0; color: #4D5F34; }}
     code {{
-      background: #EDE9FE;
-      color: #4C1D95;
+      background: #ECFCCB;
+      color: #3F6212;
       padding: 0.15rem 0.4rem;
       border-radius: 6px;
       font-size: 0.9em;
     }}
     pre {{
-      background: #F1EBFF;
-      border: 1px solid #DDD6FE;
+      background: #F0FDF4;
+      border: 1px solid #D9F99D;
       border-radius: 10px;
       padding: 1rem 1.1rem;
       overflow-x: auto;
       font-size: 0.85rem;
     }}
-    a {{ color: #6D28D9; text-decoration: none; font-weight: 500; }}
+    a {{ color: #65A30D; text-decoration: none; font-weight: 500; }}
     a:hover {{ text-decoration: underline; }}
   </style>
 </head>

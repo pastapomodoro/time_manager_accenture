@@ -1,9 +1,13 @@
 """Supabase wrapper — profiles, presets, xlsx storage."""
+import json
+from pathlib import Path
+
 import streamlit as st
 from supabase import create_client, Client
 
 BUCKET = "xlsx"
 XLSX_PATH = "ai_team_data.xlsx"
+SESSION_FILE = Path(__file__).resolve().parent / ".auth_session.json"
 
 
 @st.cache_resource
@@ -33,20 +37,100 @@ def sign_up(email: str, password: str):
 def sign_out():
     get_supabase().auth.sign_out()
     st.session_state.pop("sb_session", None)
+    clear_saved_session()
+
+
+def save_session_tokens(session) -> None:
+    if not session:
+        return
+    payload = {
+        "access_token": getattr(session, "access_token", None),
+        "refresh_token": getattr(session, "refresh_token", None),
+    }
+    if not payload["access_token"] or not payload["refresh_token"]:
+        return
+    SESSION_FILE.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def clear_saved_session() -> None:
+    try:
+        SESSION_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def restore_saved_session():
+    if not SESSION_FILE.exists():
+        return None
+    try:
+        payload = json.loads(SESSION_FILE.read_text(encoding="utf-8"))
+        access_token = payload.get("access_token")
+        refresh_token = payload.get("refresh_token")
+        if not access_token or not refresh_token:
+            clear_saved_session()
+            return None
+        res = get_supabase().auth.set_session(access_token, refresh_token)
+        return getattr(res, "session", None) or res
+    except Exception:
+        clear_saved_session()
+        return None
 
 
 # ── PROFILES ──────────────────────────────────────────────────
 
+
+def get_current_user_id() -> str | None:
+    try:
+        res = get_supabase().auth.get_user()
+        user = getattr(res, "user", None)
+        return getattr(user, "id", None)
+    except Exception:
+        return None
+
 def load_profiles_db() -> list[dict]:
-    rows = get_supabase().table("profiles").select("*").order("id").execute()
+    user_id = get_current_user_id()
+    query = get_supabase().table("profiles").select("*").order("id")
+    if user_id:
+        try:
+            rows = query.eq("user_id", user_id).execute()
+            return rows.data or []
+        except Exception as exc:
+            if "profiles.user_id does not exist" not in str(exc):
+                raise
+    rows = query.execute()
     return rows.data or []
 
 
 def save_profiles_db(profiles: list[dict]):
     sb = get_supabase()
-    sb.table("profiles").delete().neq("id", 0).execute()
+    user_id = get_current_user_id()
+    if user_id:
+        try:
+            sb.table("profiles").delete().eq("user_id", user_id).execute()
+        except Exception as exc:
+            if "profiles.user_id does not exist" not in str(exc):
+                raise
+            sb.table("profiles").delete().neq("id", 0).execute()
+    else:
+        sb.table("profiles").delete().neq("id", 0).execute()
     if profiles:
-        sb.table("profiles").insert(profiles).execute()
+        rows = []
+        for profile in profiles:
+            row = dict(profile)
+            if user_id:
+                row["user_id"] = user_id
+            rows.append(row)
+        try:
+            sb.table("profiles").insert(rows).execute()
+        except Exception as exc:
+            if "profiles.user_id does not exist" not in str(exc):
+                raise
+            fallback_rows = []
+            for profile in profiles:
+                row = dict(profile)
+                row.pop("user_id", None)
+                fallback_rows.append(row)
+            sb.table("profiles").insert(fallback_rows).execute()
 
 
 # ── PRESETS ───────────────────────────────────────────────────
