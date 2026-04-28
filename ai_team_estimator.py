@@ -843,21 +843,20 @@ def build_export_excel(nome_progetto, job_items, ore_pp, costo_pp_internal, cost
 
 
 def build_template_excel(source_bytes: bytes | None = None) -> bytes:
-    """Restituisce un template Excel scaricabile e riutilizzabile in upload."""
     if source_bytes:
         return source_bytes
 
     buf = BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
         pd.DataFrame([
-            {
-                "tipologia_id": "CAT-001",
-                "sottocategoria": "GENERATION",
-                "nome_lavorazione": "AI Image Generation",
-                "minuti_per_unita": 60,
-                "skill_richiesta": "prompt",
-                "costo_per_unita_eur": 0.0,
-            }
+            {"tipologia_id":"CAT-001","sottocategoria":"GENERATION","nome_lavorazione":"AI Image Generation","minuti_per_unita":60,"skill_richiesta":"prompt","costo_per_unita_eur":0.22},
+            {"tipologia_id":"CAT-002","sottocategoria":"POST-PRODUCTION","nome_lavorazione":"Image Post-production","minuti_per_unita":48,"skill_richiesta":"retouch","costo_per_unita_eur":0.0},
+            {"tipologia_id":"CAT-003","sottocategoria":"COLOR CORRECTION","nome_lavorazione":"Photo Color Correction","minuti_per_unita":30,"skill_richiesta":"color","costo_per_unita_eur":0.0},
+            {"tipologia_id":"CAT-004","sottocategoria":"GENERATION","nome_lavorazione":"Static Frame Animation","minuti_per_unita":90,"skill_richiesta":"motion","costo_per_unita_eur":0.0},
+            {"tipologia_id":"CAT-005","sottocategoria":"ANIMATION","nome_lavorazione":"Animation Post-production","minuti_per_unita":40,"skill_richiesta":"editing","costo_per_unita_eur":0.0},
+            {"tipologia_id":"CAT-006","sottocategoria":"GENERATION","nome_lavorazione":"AI Video Generation","minuti_per_unita":120,"skill_richiesta":"prompt","costo_per_unita_eur":3.68},
+            {"tipologia_id":"CAT-007","sottocategoria":"POST-PRODUCTION","nome_lavorazione":"Video Post-production","minuti_per_unita":60,"skill_richiesta":"editing","costo_per_unita_eur":0.0},
+            {"tipologia_id":"CAT-008","sottocategoria":"COLOR CORRECTION","nome_lavorazione":"Video Color Correction","minuti_per_unita":45,"skill_richiesta":"color","costo_per_unita_eur":0.0},
         ]).to_excel(w, sheet_name="lavorazioni", index=False)
 
         pd.DataFrame([
