@@ -2245,7 +2245,7 @@ with tab_job:
     st.markdown(f'<div class="sec-hdr" style="font-size:1.0rem">{ICO_WRENCH} Job settings</div>', unsafe_allow_html=True)
     job_type_col, s1, s2, s3 = st.columns([1.5, 1.1, 1.1, 2.8], vertical_alignment="top")
     with job_type_col:
-        st.markdown('<div style="height:26px"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="font-size:11px;font-weight:600;color:var(--muted-fg);margin-bottom:6px;display:flex;align-items:center;gap:5px">{ICO_WRENCH} Project type</div>', unsafe_allow_html=True)
         job_type = st.radio(
             "Project type",
             options=["Chargeable (LCR)", "BD / Internal (UCR)"],
@@ -2255,11 +2255,11 @@ with tab_job:
         )
         chargeable = job_type == "Chargeable (LCR)"
     with s1:
-        start_date = st.date_input("Start date", value=start_default, key="job_start_date")
+        start_date = st.date_input("📅  Start date", value=start_default, key="job_start_date")
     with s2:
-        deadline_value = st.date_input("Deadline", value=deadline_default, key="job_deadline")
+        deadline_value = st.date_input("🏁  Deadline", value=deadline_default, key="job_deadline")
     with s3:
-        with st.expander("Team on job", expanded=False):
+        with st.expander("👥  Team on job", expanded=False):
             acn_checked  = st.checkbox("ACN SONG ITA", value=True, key="team_grp_acn")
             subco_checked = st.checkbox("Subcontractors", value=False, key="team_grp_subco")
         acn_names   = [n for n in tutti_nomi_internal]
