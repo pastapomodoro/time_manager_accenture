@@ -2258,15 +2258,19 @@ with tab_job:
     with s2:
         deadline_value = st.date_input("Deadline", value=deadline_default, key="job_deadline")
     with s3:
-        team_scope = st.multiselect(
-            "Team on job",
-            options=tutti_nomi,
-            default=team_scope_default,
-            format_func=lambda n: (f"{initials(n)}  {n} (SUB)" if n in subco_names else (f"{initials(n)}  {n} (INT)" if n in intern_names else f"{initials(n)}  {n}")),
-            placeholder="Select who will work on this job…",
-            help="Leave empty to include the whole team.",
-            key="job_team_scope",
-        )
+        full_team = st.checkbox("ACN SONG ITA", value=True, key="job_full_team",
+                                help="Use the entire team on this job")
+        if full_team:
+            team_scope = tutti_nomi
+        else:
+            team_scope = st.multiselect(
+                "Select members",
+                options=tutti_nomi,
+                default=team_scope_default if team_scope_default else tutti_nomi,
+                format_func=lambda n: (f"{initials(n)}  {n} (SUB)" if n in subco_names else (f"{initials(n)}  {n} (INT)" if n in intern_names else f"{initials(n)}  {n}")),
+                placeholder="Select who will work on this job…",
+                key="job_team_scope",
+            )
         display_team_scope = team_scope or tutti_nomi
         st.markdown(compact_avatars_html(display_team_scope, color_map), unsafe_allow_html=True)
 
