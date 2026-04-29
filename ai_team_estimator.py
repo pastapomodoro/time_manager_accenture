@@ -1128,8 +1128,8 @@ body {{ padding: 0 0 16px; margin: 0; }}
 .g-month {{
   border-bottom: 2px solid #E5E7EB;
   border-right: 1px solid #E5E7EB;
-  padding: 6px 10px;
-  font-size: 12px; font-weight: 700; color: #374151;
+  padding: 10px 14px;
+  font-size: 14px; font-weight: 700; color: #374151;
   background: #F9FAFB;
   white-space: nowrap; overflow: hidden;
 }}
@@ -1139,8 +1139,8 @@ body {{ padding: 0 0 16px; margin: 0; }}
 .g-day {{
   border-bottom: 2px solid #E5E7EB;
   border-right: 1px solid #F3F4F6;
-  padding: 4px 0;
-  font-size: 10px; font-weight: 600; color: #9CA3AF;
+  padding: 6px 0;
+  font-size: 12px; font-weight: 600; color: #9CA3AF;
   text-align: center;
   background: #FAFAFA;
 }}
@@ -1154,8 +1154,8 @@ body {{ padding: 0 0 16px; margin: 0; }}
   border-bottom: 2px solid #E5E7EB;
   border-right: 2px solid #E5E7EB;
   background: #F9FAFB;
-  display: flex; align-items: flex-end; padding: 6px 10px;
-  font-size: 10px; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: .06em;
+  display: flex; align-items: flex-end; padding: 10px 14px;
+  font-size: 12px; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: .06em;
 }}
 
 /* Task rows */
@@ -1165,30 +1165,30 @@ body {{ padding: 0 0 16px; margin: 0; }}
 .g-label-cell {{
   grid-column: 1;
   display: flex; align-items: center;
-  padding: 4px 10px 4px 12px;
-  font-size: 12px; font-weight: 500; color: #374151;
+  padding: 6px 12px 6px 16px;
+  font-size: 14px; font-weight: 500; color: #374151;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   border-right: 2px solid #E5E7EB;
   border-bottom: 1px solid #F3F4F6;
   background: #fff;
-  min-height: 56px;
+  min-height: 80px;
 }}
 .g-track-cell {{
   position: relative;
   border-bottom: 1px solid #F3F4F6;
   border-right: 1px solid #F3F4F6;
   background: #fff;
-  min-height: 56px;
+  min-height: 80px;
 }}
 .g-track-cell.weekend {{ background: #FAFAFA; }}
 
 /* Bars */
 .g-bar {{
   position: absolute;
-  top: 8px; height: 40px;
-  border-radius: 6px;
-  display: flex; align-items: center; padding: 0 10px 0 10px;
-  font-size: 11px; font-weight: 700; color: #fff;
+  top: 12px; height: 56px;
+  border-radius: 8px;
+  display: flex; align-items: center; padding: 0 14px;
+  font-size: 13px; font-weight: 700; color: #fff;
   cursor: grab;
   box-shadow: 0 1px 4px rgba(0,0,0,.20);
   z-index: 4;
@@ -1487,7 +1487,7 @@ function repositionBars() {{
     const labelCell = canvas.querySelectorAll('.g-label-cell')[idx];
     if (bar && labelCell) {{
       const canvasRect = canvas.getBoundingClientRect();
-      bar.style.top = (labelCell.getBoundingClientRect().top - canvasRect.top + 8) + 'px';
+      bar.style.top = (labelCell.getBoundingClientRect().top - canvasRect.top + 12) + 'px';
     }}
   }});
 }}
@@ -2378,7 +2378,7 @@ with tab_job:
             gantt_positions=st.session_state.gantt_positions,
             deadline=deadline_value,
         )
-        gantt_height = len(job_items) * 64 + 220
+        gantt_height = len(job_items) * 96 + 260
         components.html(gantt_html, height=gantt_height, scrolling=False)
         if st.button("↺ Reset timeline to sequential", key="gantt_reset"):
             st.session_state.gantt_positions = {}
