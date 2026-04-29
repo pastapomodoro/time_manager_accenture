@@ -1117,8 +1117,8 @@ body {{ padding: 0 0 12px; }}
 .g-month {{
   border-bottom: 2px solid #E5E7EB;
   border-right: 1px solid #E5E7EB;
-  padding: 4px 8px;
-  font-size: 11px; font-weight: 700; color: #374151;
+  padding: 6px 10px;
+  font-size: 12px; font-weight: 700; color: #374151;
   background: #F9FAFB;
   white-space: nowrap; overflow: hidden;
 }}
@@ -1128,8 +1128,8 @@ body {{ padding: 0 0 12px; }}
 .g-day {{
   border-bottom: 2px solid #E5E7EB;
   border-right: 1px solid #F3F4F6;
-  padding: 3px 0;
-  font-size: 9px; font-weight: 600; color: #9CA3AF;
+  padding: 4px 0;
+  font-size: 10px; font-weight: 600; color: #9CA3AF;
   text-align: center;
   background: #FAFAFA;
 }}
@@ -1155,29 +1155,29 @@ body {{ padding: 0 0 12px; }}
   grid-column: 1;
   display: flex; align-items: center;
   padding: 4px 10px 4px 12px;
-  font-size: 11px; font-weight: 500; color: #374151;
+  font-size: 12px; font-weight: 500; color: #374151;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   border-right: 2px solid #E5E7EB;
   border-bottom: 1px solid #F3F4F6;
   background: #fff;
-  min-height: 40px;
+  min-height: 56px;
 }}
 .g-track-cell {{
   position: relative;
   border-bottom: 1px solid #F3F4F6;
   border-right: 1px solid #F3F4F6;
   background: #fff;
-  min-height: 40px;
+  min-height: 56px;
 }}
 .g-track-cell.weekend {{ background: #FAFAFA; }}
 
 /* Bars */
 .g-bar {{
   position: absolute;
-  top: 5px; height: 30px;
-  border-radius: 5px;
-  display: flex; align-items: center; padding: 0 8px 0 8px;
-  font-size: 10px; font-weight: 700; color: #fff;
+  top: 8px; height: 40px;
+  border-radius: 6px;
+  display: flex; align-items: center; padding: 0 10px 0 10px;
+  font-size: 11px; font-weight: 700; color: #fff;
   cursor: grab;
   box-shadow: 0 1px 4px rgba(0,0,0,.20);
   z-index: 4;
@@ -1222,7 +1222,7 @@ const TASKS       = {tasks_json};
 const RANGE_START = new Date('{range_start_iso}T00:00:00');
 const TOTAL_DAYS  = {total_days_val};
 const DAY_MS      = 86400000;
-const COL_W       = 28; // px per day
+const COL_W       = 40; // px per day
 
 // Set CSS variables
 const canvas = document.getElementById('canvas');
@@ -2316,7 +2316,7 @@ with tab_job:
             start_date=start_date,
             gantt_positions=st.session_state.gantt_positions,
         )
-        gantt_height = max(320, len(job_items) * 48 + 140)
+        gantt_height = max(400, len(job_items) * 64 + 180)
         components.html(gantt_html, height=gantt_height, scrolling=False)
         if st.button("↺ Reset timeline to sequential", key="gantt_reset"):
             st.session_state.gantt_positions = {}
