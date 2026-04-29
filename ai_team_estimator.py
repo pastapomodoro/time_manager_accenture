@@ -1002,7 +1002,6 @@ def build_gantt_html(
     import datetime as _dt
 
     def _add_bdays(d, n):
-        """Add n business days to date d."""
         cur = d
         added = 0
         while added < n:
@@ -1011,7 +1010,6 @@ def build_gantt_html(
                 added += 1
         return cur
 
-    # Build task list with start/end as date objects
     tasks = []
     cursor = start_date
 
@@ -1021,36 +1019,34 @@ def build_gantt_html(
         giorni = max(_math.ceil(ore_reali / ore_giornata), 1)
 
         if task_id in gantt_positions:
-            t_start_str = gantt_positions[task_id]["start"]
-            t_end_str   = gantt_positions[task_id]["end"]
-            t_start = _dt.date.fromisoformat(t_start_str)
-            t_end   = _dt.date.fromisoformat(t_end_str)
+            t_start = _dt.date.fromisoformat(gantt_positions[task_id]["start"])
+            t_end   = _dt.date.fromisoformat(gantt_positions[task_id]["end"])
         else:
             t_start = cursor
             t_end   = _add_bdays(cursor, giorni)
             cursor  = t_end
 
         tasks.append({
-            "id":    task_id,
-            "name":  it["nome"],
-            "start": t_start.isoformat(),
-            "end":   t_end.isoformat(),
-            "days":  giorni,
-            "color": gantt_color(it["fase"]),
+            "id":       task_id,
+            "name":     it["nome"],
+            "start":    t_start.isoformat(),
+            "end":      t_end.isoformat(),
+            "days":     giorni,
+            "color":    gantt_color(it["fase"]),
             "assigned": ", ".join(it["assigned"]) if it["assigned"] else "—",
         })
 
     if not tasks:
         return "<html><body></body></html>"
 
-    # Compute overall date range
-    all_starts = [_dt.date.fromisoformat(t["start"]) for t in tasks]
-    all_ends   = [_dt.date.fromisoformat(t["end"])   for t in tasks]
+    all_starts  = [_dt.date.fromisoformat(t["start"]) for t in tasks]
+    all_ends    = [_dt.date.fromisoformat(t["end"])   for t in tasks]
     range_start = min(all_starts)
-    range_end   = max(all_ends)
-    total_days  = max((range_end - range_start).days, 1)
+    # Pad right by 20% so there's empty space to drag bars into
+    raw_span    = max((max(all_ends) - range_start).days, 1)
+    range_end   = range_start + _dt.timedelta(days=int(raw_span * 1.4) + 7)
 
-    tasks_json = _json.dumps(tasks)
+    tasks_json      = _json.dumps(tasks)
     range_start_iso = range_start.isoformat()
     range_end_iso   = range_end.isoformat()
 
@@ -1060,105 +1056,187 @@ def build_gantt_html(
 <meta charset="utf-8">
 <style>
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-body {{ background: #fff; font-family: 'Inter', system-ui, sans-serif; padding: 12px 8px 16px; }}
+body {{
+  background: #fff;
+  font-family: 'Inter', system-ui, sans-serif;
+  padding: 12px 8px 16px;
+  user-select: none;
+}}
 .g-title {{
   font-size: 0.72rem; font-weight: 700; letter-spacing: .08em;
   color: #9CA3AF; text-transform: uppercase; margin-bottom: 10px;
 }}
 .g-wrap {{ overflow-x: auto; }}
 .g-grid {{ min-width: 600px; }}
-.g-header {{ display: flex; margin-bottom: 4px; padding-left: 180px; }}
+.g-header {{ display: flex; margin-bottom: 4px; padding-left: 180px; border-bottom: 1px solid #F3F4F6; padding-bottom: 4px; }}
 .g-hcell {{
   font-size: 10px; color: #9CA3AF; font-weight: 600;
-  text-align: center; flex-shrink: 0;
+  flex-shrink: 0; padding: 0 2px;
 }}
-.g-row {{ display: flex; align-items: center; margin-bottom: 6px; min-height: 34px; }}
+.g-row {{ display: flex; align-items: center; margin-bottom: 5px; }}
 .g-label {{
   width: 176px; min-width: 176px; font-size: 11px; font-weight: 500;
-  color: #374151; padding-right: 8px; overflow: hidden;
+  color: #374151; padding-right: 10px; overflow: hidden;
   white-space: nowrap; text-overflow: ellipsis;
 }}
 .g-track {{
-  flex: 1; position: relative; height: 28px;
+  flex: 1; position: relative; height: 30px;
   background: #F9FAFB; border-radius: 4px;
+  overflow: visible;
 }}
 .g-bar {{
-  position: absolute; height: 28px; border-radius: 5px;
+  position: absolute; height: 30px; border-radius: 5px;
   display: flex; align-items: center; padding: 0 8px;
-  font-size: 10px; font-weight: 600; color: #fff;
-  white-space: nowrap; overflow: hidden; cursor: default;
-  transition: opacity .15s;
-  box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  font-size: 10px; font-weight: 700; color: #fff;
+  white-space: nowrap; overflow: hidden;
+  cursor: grab;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+  transition: box-shadow .1s;
+  z-index: 2;
 }}
-.g-bar:hover {{ opacity: .85; }}
+.g-bar.dragging {{
+  cursor: grabbing;
+  box-shadow: 0 4px 16px rgba(0,0,0,.28);
+  opacity: .92;
+  z-index: 10;
+}}
 .g-tooltip {{
   position: fixed; background: #1F2937; color: #fff;
   padding: 6px 10px; border-radius: 6px; font-size: 11px;
   pointer-events: none; display: none; z-index: 9999;
-  white-space: nowrap; line-height: 1.6;
+  white-space: nowrap; line-height: 1.7;
 }}
-.g-divider {{ border: none; border-top: 1px solid #F3F4F6; margin: 2px 0 8px; }}
 </style>
 </head>
 <body>
-<div class="g-title">Timeline (sequential — based on task duration)</div>
+<div class="g-title">Timeline — drag bars to set parallelism</div>
 <div class="g-tooltip" id="tip"></div>
 <div class="g-wrap">
-<div class="g-grid" id="grid"></div>
+  <div class="g-grid" id="grid"></div>
 </div>
 <script>
 const TASKS       = {tasks_json};
-const RANGE_START = new Date('{range_start_iso}');
-const RANGE_END   = new Date('{range_end_iso}');
-const TOTAL_MS    = RANGE_END - RANGE_START || 86400000;
+const RANGE_START = new Date('{range_start_iso}T00:00:00');
+const RANGE_END   = new Date('{range_end_iso}T00:00:00');
+const TOTAL_MS    = RANGE_END - RANGE_START;
+const DAY_MS      = 86400000;
 
-function pct(d) {{
-  return ((new Date(d) - RANGE_START) / TOTAL_MS * 100).toFixed(2) + '%';
+function msToLeftPct(ms) {{
+  return Math.max(0, (ms - RANGE_START) / TOTAL_MS * 100);
 }}
-function pctW(s, e) {{
-  return (Math.max((new Date(e) - new Date(s)) / TOTAL_MS * 100, 0.5)).toFixed(2) + '%';
+function durationPct(ms) {{
+  return ms / TOTAL_MS * 100;
+}}
+function pxToDate(trackEl, px) {{
+  const tw = trackEl.getBoundingClientRect().width;
+  const ratio = Math.max(0, Math.min(1, px / tw));
+  return new Date(RANGE_START.getTime() + ratio * TOTAL_MS);
+}}
+function snapToDay(d) {{
+  const ms = Math.round(d.getTime() / DAY_MS) * DAY_MS;
+  return new Date(ms);
+}}
+function fmtDate(d) {{
+  return d.toISOString().split('T')[0];
+}}
+function addBdays(d, n) {{
+  let cur = new Date(d); let added = 0;
+  while (added < n) {{ cur = new Date(cur.getTime() + DAY_MS); if (cur.getDay() !== 0 && cur.getDay() !== 6) added++; }}
+  return cur;
 }}
 
-// Build date axis labels (weekly)
-function buildHeader() {{
-  const h = document.createElement('div');
-  h.className = 'g-header';
+// Build weekly header
+const grid = document.getElementById('grid');
+const tip  = document.getElementById('tip');
+
+(function buildHeader() {{
+  const h = document.createElement('div'); h.className = 'g-header';
   const cur = new Date(RANGE_START);
-  while (cur <= RANGE_END) {{
-    const cell = document.createElement('div');
-    cell.className = 'g-hcell';
-    cell.style.width = pctW(cur, new Date(cur.getTime() + 7*86400000));
+  while (cur < RANGE_END) {{
+    const next = new Date(cur.getTime() + 7 * DAY_MS);
+    const cell = document.createElement('div'); cell.className = 'g-hcell';
+    cell.style.width = durationPct(Math.min(next, RANGE_END) - cur).toFixed(2) + '%';
     cell.textContent = cur.toLocaleDateString('en-GB', {{day:'2-digit', month:'short'}});
     h.appendChild(cell);
     cur.setDate(cur.getDate() + 7);
   }}
-  return h;
-}}
+  grid.appendChild(h);
+}})();
 
-const grid = document.getElementById('grid');
-const tip  = document.getElementById('tip');
+// State per task
+const state = TASKS.map(t => ({{
+  ...t,
+  startD: new Date(t.start + 'T00:00:00'),
+  endD:   new Date(t.end   + 'T00:00:00'),
+}}));
 
-grid.appendChild(buildHeader());
-grid.appendChild(Object.assign(document.createElement('hr'), {{className:'g-divider'}}));
+state.forEach((t, idx) => {{
+  const durMs = t.endD - t.startD;
 
-TASKS.forEach(t => {{
   const row   = document.createElement('div'); row.className = 'g-row';
   const label = document.createElement('div'); label.className = 'g-label';
   label.textContent = t.name; label.title = t.name;
   const track = document.createElement('div'); track.className = 'g-track';
   const bar   = document.createElement('div'); bar.className = 'g-bar';
-  bar.style.left       = pct(t.start);
-  bar.style.width      = pctW(t.start, t.end);
-  bar.style.background = t.color;
-  bar.textContent = t.days + 'd';
 
-  bar.addEventListener('mousemove', e => {{
+  function render() {{
+    bar.style.left  = msToLeftPct(t.startD).toFixed(3) + '%';
+    bar.style.width = durationPct(durMs).toFixed(3) + '%';
+    bar.style.background = t.color;
+    bar.textContent = t.days + 'd';
+  }}
+  render();
+
+  // ── Drag logic ──
+  let dragStartX = 0, dragStartLeft = 0;
+
+  bar.addEventListener('mousedown', e => {{
+    e.preventDefault();
+    tip.style.display = 'none';
+    bar.classList.add('dragging');
+    const tw = track.getBoundingClientRect().width;
+    dragStartX    = e.clientX;
+    dragStartLeft = msToLeftPct(t.startD) / 100 * tw;
+
+    function onMove(ev) {{
+      const dx      = ev.clientX - dragStartX;
+      const newLeft = Math.max(0, dragStartLeft + dx);
+      const newStart = snapToDay(pxToDate(track, newLeft));
+      const newEnd   = new Date(newStart.getTime() + durMs);
+      t.startD = newStart;
+      t.endD   = newEnd;
+      render();
+      // live tooltip while dragging
+      tip.style.display = 'block';
+      tip.style.left = (ev.clientX + 14) + 'px';
+      tip.style.top  = (ev.clientY - 10) + 'px';
+      tip.innerHTML  = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{t.days}} working day(s)`;
+    }}
+
+    function onUp() {{
+      bar.classList.remove('dragging');
+      tip.style.display = 'none';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }}
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }});
+
+  // Hover tooltip (when not dragging)
+  bar.addEventListener('mouseenter', e => {{
+    if (bar.classList.contains('dragging')) return;
     tip.style.display = 'block';
+    tip.innerHTML = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{t.days}} working day(s)<br>${{t.assigned}}`;
+  }});
+  bar.addEventListener('mousemove', e => {{
     tip.style.left = (e.clientX + 14) + 'px';
     tip.style.top  = (e.clientY - 10) + 'px';
-    tip.innerHTML  = `<b>${{t.name}}</b><br>${{t.start}} → ${{t.end}}<br>${{t.days}} working day(s)<br>${{t.assigned}}`;
   }});
-  bar.addEventListener('mouseleave', () => tip.style.display = 'none');
+  bar.addEventListener('mouseleave', () => {{
+    if (!bar.classList.contains('dragging')) tip.style.display = 'none';
+  }});
 
   track.appendChild(bar);
   row.appendChild(label);
