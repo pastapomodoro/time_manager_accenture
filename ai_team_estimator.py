@@ -999,8 +999,19 @@ def build_gantt_html(
 ) -> str:
     import json as _json
     import math as _math
-    import numpy as _np
+    import datetime as _dt
 
+    def _add_bdays(d, n):
+        """Add n business days to date d."""
+        cur = d
+        added = 0
+        while added < n:
+            cur += _dt.timedelta(days=1)
+            if cur.weekday() < 5:
+                added += 1
+        return cur
+
+    # Build task list with start/end as date objects
     tasks = []
     cursor = start_date
 
@@ -1010,111 +1021,150 @@ def build_gantt_html(
         giorni = max(_math.ceil(ore_reali / ore_giornata), 1)
 
         if task_id in gantt_positions:
-            t_start = gantt_positions[task_id]["start"]
-            t_end   = gantt_positions[task_id]["end"]
+            t_start_str = gantt_positions[task_id]["start"]
+            t_end_str   = gantt_positions[task_id]["end"]
+            t_start = _dt.date.fromisoformat(t_start_str)
+            t_end   = _dt.date.fromisoformat(t_end_str)
         else:
-            t_start = cursor.strftime("%Y-%m-%d")
-            t_end   = _np.busday_offset(cursor, giorni, roll="forward").astype(str)
-            cursor  = _np.busday_offset(cursor, giorni, roll="forward").astype(object)
+            t_start = cursor
+            t_end   = _add_bdays(cursor, giorni)
+            cursor  = t_end
 
         tasks.append({
-            "id":       task_id,
-            "name":     it["nome"][:30],
-            "start":    t_start,
-            "end":      t_end,
-            "progress": 0,
-            "color":    gantt_color(it["fase"]),
+            "id":    task_id,
+            "name":  it["nome"],
+            "start": t_start.isoformat(),
+            "end":   t_end.isoformat(),
+            "days":  giorni,
+            "color": gantt_color(it["fase"]),
+            "assigned": ", ".join(it["assigned"]) if it["assigned"] else "—",
         })
 
-    tasks_json = _json.dumps(tasks)
+    if not tasks:
+        return "<html><body></body></html>"
 
-    color_css = "\n".join(
-        f".bar-{fase.lower().replace(' ', '-')[:20]} .bar {{ fill: {color} !important; }}"
-        for fase, color in GANTT_COLORS.items()
-    )
+    # Compute overall date range
+    all_starts = [_dt.date.fromisoformat(t["start"]) for t in tasks]
+    all_ends   = [_dt.date.fromisoformat(t["end"])   for t in tasks]
+    range_start = min(all_starts)
+    range_end   = max(all_ends)
+    total_days  = max((range_end - range_start).days, 1)
+
+    tasks_json = _json.dumps(tasks)
+    range_start_iso = range_start.isoformat()
+    range_end_iso   = range_end.isoformat()
 
     return f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css">
 <style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ background: transparent; font-family: 'Inter', system-ui, sans-serif; }}
-  #gantt-container {{ padding: 8px 0 12px; }}
-  .gantt-title {{
-    font-size: 0.78rem; font-weight: 600; letter-spacing: .06em;
-    color: #6B7280; text-transform: uppercase; margin-bottom: 10px; padding-left: 4px;
-  }}
-  .gantt .bar-label {{ font-size: 11px !important; }}
-  .gantt .bar {{ rx: 4; }}
-  {color_css}
-  .gantt .bar {{ fill: {GANTT_COLOR_DEFAULT}; }}
-  .gantt .bar-progress {{ fill: transparent !important; }}
-  .view-btns {{ display:flex; gap:6px; margin-bottom:8px; padding-left:4px; }}
-  .view-btn {{
-    font-size:11px; padding:3px 10px; border-radius:100px; border:1px solid #D1D5DB;
-    background:white; cursor:pointer; color:#374151; font-weight:500;
-  }}
-  .view-btn.active {{ background:#111827; color:white; border-color:#111827; }}
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+body {{ background: #fff; font-family: 'Inter', system-ui, sans-serif; padding: 12px 8px 16px; }}
+.g-title {{
+  font-size: 0.72rem; font-weight: 700; letter-spacing: .08em;
+  color: #9CA3AF; text-transform: uppercase; margin-bottom: 10px;
+}}
+.g-wrap {{ overflow-x: auto; }}
+.g-grid {{ min-width: 600px; }}
+.g-header {{ display: flex; margin-bottom: 4px; padding-left: 180px; }}
+.g-hcell {{
+  font-size: 10px; color: #9CA3AF; font-weight: 600;
+  text-align: center; flex-shrink: 0;
+}}
+.g-row {{ display: flex; align-items: center; margin-bottom: 6px; min-height: 34px; }}
+.g-label {{
+  width: 176px; min-width: 176px; font-size: 11px; font-weight: 500;
+  color: #374151; padding-right: 8px; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis;
+}}
+.g-track {{
+  flex: 1; position: relative; height: 28px;
+  background: #F9FAFB; border-radius: 4px;
+}}
+.g-bar {{
+  position: absolute; height: 28px; border-radius: 5px;
+  display: flex; align-items: center; padding: 0 8px;
+  font-size: 10px; font-weight: 600; color: #fff;
+  white-space: nowrap; overflow: hidden; cursor: default;
+  transition: opacity .15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.15);
+}}
+.g-bar:hover {{ opacity: .85; }}
+.g-tooltip {{
+  position: fixed; background: #1F2937; color: #fff;
+  padding: 6px 10px; border-radius: 6px; font-size: 11px;
+  pointer-events: none; display: none; z-index: 9999;
+  white-space: nowrap; line-height: 1.6;
+}}
+.g-divider {{ border: none; border-top: 1px solid #F3F4F6; margin: 2px 0 8px; }}
 </style>
 </head>
 <body>
-<div id="gantt-container">
-  <div class="gantt-title">Timeline — drag bars to set parallelism</div>
-  <div class="view-btns">
-    <button class="view-btn active" onclick="setView('Day', this)">Day</button>
-    <button class="view-btn" onclick="setView('Week', this)">Week</button>
-    <button class="view-btn" onclick="setView('Month', this)">Month</button>
-  </div>
-  <div id="gantt"></div>
+<div class="g-title">Timeline (sequential — based on task duration)</div>
+<div class="g-tooltip" id="tip"></div>
+<div class="g-wrap">
+<div class="g-grid" id="grid"></div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.umd.js"></script>
 <script>
-  const TASKS = {tasks_json};
-  function applyColors() {{
-    TASKS.forEach((t, i) => {{
-      const bars = document.querySelectorAll('.bar-wrapper');
-      if (bars[i]) {{
-        const rect = bars[i].querySelector('.bar');
-        if (rect) rect.setAttribute('fill', t.color);
-      }}
-    }});
+const TASKS       = {tasks_json};
+const RANGE_START = new Date('{range_start_iso}');
+const RANGE_END   = new Date('{range_end_iso}');
+const TOTAL_MS    = RANGE_END - RANGE_START || 86400000;
+
+function pct(d) {{
+  return ((new Date(d) - RANGE_START) / TOTAL_MS * 100).toFixed(2) + '%';
+}}
+function pctW(s, e) {{
+  return (Math.max((new Date(e) - new Date(s)) / TOTAL_MS * 100, 0.5)).toFixed(2) + '%';
+}}
+
+// Build date axis labels (weekly)
+function buildHeader() {{
+  const h = document.createElement('div');
+  h.className = 'g-header';
+  const cur = new Date(RANGE_START);
+  while (cur <= RANGE_END) {{
+    const cell = document.createElement('div');
+    cell.className = 'g-hcell';
+    cell.style.width = pctW(cur, new Date(cur.getTime() + 7*86400000));
+    cell.textContent = cur.toLocaleDateString('en-GB', {{day:'2-digit', month:'short'}});
+    h.appendChild(cell);
+    cur.setDate(cur.getDate() + 7);
   }}
-  const gantt = new Gantt('#gantt', TASKS, {{
-    view_mode: 'Day',
-    date_format: 'YYYY-MM-DD',
-    column_width: 38,
-    bar_height: 28,
-    bar_corner_radius: 4,
-    arrow_curve: 5,
-    padding: 12,
-    view_mode_select: false,
-    readonly: false,
-    move_dependencies: false,
-    on_date_change: function(task, start, end) {{
-      window.parent.postMessage({{
-        type: 'gantt_update',
-        task_id: task.id,
-        new_start: start.toISOString().split('T')[0],
-        new_end:   end.toISOString().split('T')[0],
-      }}, '*');
-    }},
-    on_view_change: function() {{ setTimeout(applyColors, 100); }},
-    custom_popup_html: function(task) {{
-      return `<div style="padding:8px 12px;font-size:12px;max-width:200px">
-        <strong>${{task.name}}</strong><br>
-        ${{task.start}} → ${{task.end}}
-      </div>`;
-    }},
+  return h;
+}}
+
+const grid = document.getElementById('grid');
+const tip  = document.getElementById('tip');
+
+grid.appendChild(buildHeader());
+grid.appendChild(Object.assign(document.createElement('hr'), {{className:'g-divider'}}));
+
+TASKS.forEach(t => {{
+  const row   = document.createElement('div'); row.className = 'g-row';
+  const label = document.createElement('div'); label.className = 'g-label';
+  label.textContent = t.name; label.title = t.name;
+  const track = document.createElement('div'); track.className = 'g-track';
+  const bar   = document.createElement('div'); bar.className = 'g-bar';
+  bar.style.left       = pct(t.start);
+  bar.style.width      = pctW(t.start, t.end);
+  bar.style.background = t.color;
+  bar.textContent = t.days + 'd';
+
+  bar.addEventListener('mousemove', e => {{
+    tip.style.display = 'block';
+    tip.style.left = (e.clientX + 14) + 'px';
+    tip.style.top  = (e.clientY - 10) + 'px';
+    tip.innerHTML  = `<b>${{t.name}}</b><br>${{t.start}} → ${{t.end}}<br>${{t.days}} working day(s)<br>${{t.assigned}}`;
   }});
-  setTimeout(applyColors, 200);
-  function setView(mode, btn) {{
-    gantt.change_view_mode(mode);
-    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    setTimeout(applyColors, 200);
-  }}
+  bar.addEventListener('mouseleave', () => tip.style.display = 'none');
+
+  track.appendChild(bar);
+  row.appendChild(label);
+  row.appendChild(track);
+  grid.appendChild(row);
+}});
 </script>
 </body>
 </html>"""
@@ -2065,7 +2115,7 @@ with tab_job:
 
         # ── Gantt calendar override ──────────────────────────────
         if st.session_state.get("gantt_positions"):
-            import numpy as _np_gc
+            import datetime as _dt_gc
             try:
                 end_dates = [
                     pos["end"]
@@ -2073,11 +2123,10 @@ with tab_job:
                     if pos.get("end")
                 ]
                 if end_dates:
-                    last_end    = max(end_dates)
-                    first_start = start_date.strftime("%Y-%m-%d")
-                    gantt_days  = int(_np_gc.busday_count(first_start, last_end))
-                    if gantt_days > 0:
-                        giorni_cal = float(gantt_days)
+                    last_end = _dt_gc.date.fromisoformat(max(end_dates))
+                    gantt_cal_days = (last_end - start_date).days
+                    if gantt_cal_days > 0:
+                        giorni_cal = float(gantt_cal_days)
             except Exception:
                 pass
 
