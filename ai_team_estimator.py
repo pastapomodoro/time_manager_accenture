@@ -2426,12 +2426,8 @@ with tab_job:
         gantt_height = len(job_items) * 72 + 100
         components.html(gantt_html, height=gantt_height, scrolling=False)
 
-    # ── Deliverables override ──
-    st.divider()
-    st.markdown(f'<div class="sec-hdr">{ICO_CLIP} Deliverables</div>', unsafe_allow_html=True)
-    dv1, dv2 = st.columns(2)
-    deliverables_img = dv1.number_input("Images", min_value=0, step=1, value=0, key="dlv_img", help="Leave 0 to auto-count from AI image tasks")
-    deliverables_vid = dv2.number_input("Videos", min_value=0, step=1, value=0, key="dlv_vid", help="Leave 0 to auto-count from AI video tasks")
+    deliverables_img = 0
+    deliverables_vid = 0
 
     # ── Results ──
     st.divider()
