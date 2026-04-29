@@ -2419,11 +2419,8 @@ with tab_job:
             gantt_positions=st.session_state.gantt_positions,
             deadline=deadline_value,
         )
-        gantt_height = len(job_items) * 68 + 180
+        gantt_height = len(job_items) * 72 + 100
         components.html(gantt_html, height=gantt_height, scrolling=False)
-        if st.button("↺ Reset timeline to sequential", key="gantt_reset"):
-            st.session_state.gantt_positions = {}
-            st.rerun()
 
     # ── Deliverables override ──
     st.divider()
