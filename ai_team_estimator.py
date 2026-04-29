@@ -1252,12 +1252,14 @@ html,body{{height:100%;width:100%;background:#F8F9FB;font-family:'Inter',system-
 .g-tip{{
   position:fixed;
   background:#1E1E2E;color:#E2E8F0;
-  padding:10px 14px;border-radius:10px;
-  font-size:12px;line-height:1.8;
-  pointer-events:none;display:none;z-index:9999;
+  padding:12px 16px;border-radius:12px;
+  font-size:13px;line-height:1.9;
+  pointer-events:none;display:none;
+  z-index:2147483647;
   white-space:nowrap;
-  box-shadow:0 8px 24px rgba(0,0,0,.30);
-  border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 12px 40px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.12);
+  transform:translateZ(0);
 }}
 .g-tip b{{color:#fff;font-size:13px;display:block;margin-bottom:2px}}
 .g-tip .tip-row{{display:flex;align-items:center;gap:6px;color:#94A3B8}}
@@ -1277,10 +1279,10 @@ html,body{{height:100%;width:100%;background:#F8F9FB;font-family:'Inter',system-
   <div class="legend" id="legend"></div>
 </div>
 
-<div class="g-tip" id="tip"></div>
 <div class="g-scroll">
   <div class="g-canvas" id="canvas"></div>
 </div>
+<div class="g-tip" id="tip"></div>
 
 <script>
 const TASKS           = {tasks_json};
@@ -1451,15 +1453,23 @@ function buildGrid(){{
     setTimeout(posBar,0);
 
     /* Tooltip helper */
+    function placeTip(ev){{
+      const tw=tip.offsetWidth||220, th=tip.offsetHeight||100;
+      const vw=window.innerWidth, vh=window.innerHeight;
+      let x=ev.clientX+18, y=ev.clientY-14;
+      if(x+tw>vw-8) x=ev.clientX-tw-12;
+      if(y+th>vh-8) y=vh-th-8;
+      if(y<8) y=8;
+      tip.style.left=x+'px'; tip.style.top=y+'px';
+    }}
     function showTip(ev){{
       const bd=bdays(t.startD,t.endD);
       tip.style.display='block';
-      tip.style.left=(ev.clientX+18)+'px';
-      tip.style.top=(ev.clientY-14)+'px';
       tip.innerHTML=`<b>${{t.name}}</b>
         <div class="tip-row"><div class="tip-dot" style="background:${{t.color}}"></div>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}</div>
-        <div class="tip-row" style="color:#64748B">${{bd}} working day${{bd!==1?'s':''}}</div>
-        <div class="tip-row" style="color:#64748B">${{t.assigned||'Unassigned'}}</div>`;
+        <div class="tip-row" style="color:#94A3B8">${{bd}} working day${{bd!==1?'s':''}}</div>
+        <div class="tip-row" style="color:#94A3B8">${{t.assigned||'Unassigned'}}</div>`;
+      placeTip(ev);
     }}
 
     /* Move */
@@ -1470,7 +1480,7 @@ function buildGrid(){{
       function mv(ev){{
         const nc=Math.max(0,sc+Math.round((ev.clientX-sx)/COL_W));
         t.startD=colToDate(nc); t.endD=new Date(t.startD.getTime()+durMs);
-        render(); showTip(ev);
+        render(); showTip(ev); placeTip(ev);
       }}
       function up(){{
         bar.classList.remove('dragging'); tip.style.display='none';
@@ -1487,7 +1497,7 @@ function buildGrid(){{
       function mv(ev){{
         const nd=Math.max(1,sd+Math.round((ev.clientX-sx)/COL_W));
         t.endD=new Date(t.startD.getTime()+nd*DAY_MS);
-        render(); showTip(ev);
+        render(); showTip(ev); placeTip(ev);
       }}
       function up(){{
         bar.classList.remove('resizing'); tip.style.display='none';
@@ -1499,7 +1509,7 @@ function buildGrid(){{
     bar.addEventListener('mouseenter',showTip);
     bar.addEventListener('mousemove',e=>{{
       if(bar.classList.contains('dragging')||bar.classList.contains('resizing'))return;
-      tip.style.left=(e.clientX+18)+'px'; tip.style.top=(e.clientY-14)+'px';
+      placeTip(e);
     }});
     bar.addEventListener('mouseleave',()=>{{
       if(!bar.classList.contains('dragging')&&!bar.classList.contains('resizing'))
