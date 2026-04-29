@@ -2259,8 +2259,7 @@ with tab_job:
     with s2:
         deadline_value = st.date_input("Deadline", value=deadline_default, key="job_deadline")
     with s3:
-        st.markdown("**Team on job**")
-        with st.expander("Select teams", expanded=False):
+        with st.expander("Team on job", expanded=False):
             acn_checked  = st.checkbox("ACN SONG ITA", value=True, key="team_grp_acn")
             subco_checked = st.checkbox("Subcontractors", value=False, key="team_grp_subco")
         acn_names   = [n for n in tutti_nomi_internal]
