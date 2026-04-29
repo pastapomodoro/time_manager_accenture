@@ -2243,9 +2243,8 @@ with tab_job:
     # ── Job type (LCR / UCR) ──
     chargeable_default = bool(preset_meta.get("chargeable", True))
     st.markdown(f'<div class="sec-hdr" style="font-size:1.0rem">{ICO_WRENCH} Job settings</div>', unsafe_allow_html=True)
-    job_type_col, s1, s2, s3 = st.columns([1.5, 1.1, 1.1, 2.8])
+    job_type_col, s1, s2, s3 = st.columns([1.5, 1.1, 1.1, 2.8], vertical_alignment="bottom")
     with job_type_col:
-        st.markdown('<div style="height:28px"></div>', unsafe_allow_html=True)
         job_type = st.radio(
             "Project type",
             options=["Chargeable (LCR)", "BD / Internal (UCR)"],
