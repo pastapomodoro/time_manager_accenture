@@ -247,17 +247,41 @@ RETRY_MULTIPLIER = 4
 SUBCO_COLOR      = "#EC4899"
 
 GANTT_COLORS: dict[str, str] = {
-    "GENERATION":       "#3B82F6",
-    "POST-PRODUCTION":  "#EC4899",
-    "ANIMATION":        "#EAB308",
-    "COLOR CORRECTION": "#F97316",
-    "EDITING":          "#8B5CF6",
+    "GENERATION":       "#3B82F6",   # blue  — AI image / static generation
+    "POST-PRODUCTION":  "#EC4899",   # pink  — post-production image
+    "COLOR CORRECTION": "#F97316",   # orange
+    "ANIMATION":        "#A855F7",   # purple — frame animation
+    "VIDEO":            "#22C55E",   # green — AI video generation
+    "POST-PROD":        "#EC4899",   # pink  (alias for post-production)
+    "EDITING":          "#8B5CF6",   # violet
 }
 GANTT_COLOR_DEFAULT = "#6B7280"
 
-def gantt_color(fase: str) -> str:
-    for key, color in GANTT_COLORS.items():
-        if key in (fase or "").upper():
+# Per-task name overrides (matched before fase)
+_GANTT_NAME_COLORS: dict[str, str] = {
+    "AI VIDEO":         "#22C55E",   # green
+    "VIDEO GENERATION": "#22C55E",
+    "POST-PRODUZIONE VIDEO":  "#EAB308",   # yellow
+    "POST-PRODUCTION VIDEO":  "#EAB308",
+    "POST-PROD VIDEO":        "#EAB308",
+    "COLOR CORRECTION VIDEO": "#F97316",
+    "ANIMATION":              "#A855F7",
+    "ANIMAZIONE":             "#A855F7",
+    "GENERAZIONE IMMAGINE":   "#3B82F6",
+    "AI IMAGE":               "#3B82F6",
+    "POST-PRODUZIONE IMMAGINE": "#EC4899",
+    "POST-PRODUCTION IMAGE":    "#EC4899",
+    "COLOR CORRECTION FOTO":    "#F97316",
+}
+
+def gantt_color(nome: str, fase: str = "") -> str:
+    key = (nome or "").upper()
+    for pattern, color in _GANTT_NAME_COLORS.items():
+        if pattern in key:
+            return color
+    key2 = (fase or "").upper()
+    for pattern, color in GANTT_COLORS.items():
+        if pattern in key2 or pattern in key:
             return color
     return GANTT_COLOR_DEFAULT
 
@@ -1032,7 +1056,7 @@ def build_gantt_html(
             "start":    t_start.isoformat(),
             "end":      t_end.isoformat(),
             "days":     giorni,
-            "color":    gantt_color(it["fase"]),
+            "color":    gantt_color(it["nome"], it["fase"]),
             "assigned": ", ".join(it["assigned"]) if it["assigned"] else "—",
         })
 
