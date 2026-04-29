@@ -1085,8 +1085,10 @@ html, body {{
   font-family: 'Inter', system-ui, sans-serif;
   user-select: none;
   height: 100%;
+  width: 100%;
 }}
-body {{ padding: 0 0 12px; }}
+body {{ padding: 0 0 16px; margin: 0; }}
+.g-scroll {{ width: 100%; }}
 
 /* ── Layout ── */
 .g-outer {{
@@ -2316,8 +2318,8 @@ with tab_job:
             start_date=start_date,
             gantt_positions=st.session_state.gantt_positions,
         )
-        gantt_height = max(400, len(job_items) * 64 + 180)
-        components.html(gantt_html, height=gantt_height, scrolling=False)
+        gantt_height = max(600, len(job_items) * 64 + 220)
+        components.html(gantt_html, height=gantt_height, scrolling=True)
         if st.button("↺ Reset timeline to sequential", key="gantt_reset"):
             st.session_state.gantt_positions = {}
             st.rerun()
