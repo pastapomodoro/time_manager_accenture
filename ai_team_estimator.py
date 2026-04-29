@@ -1507,14 +1507,6 @@ function buildGrid(){{
     }});
   }});
 
-  /* Today vertical line */
-  const todayCol=dateToCol(today);
-  if(todayCol>=0&&todayCol<TOTAL_DAYS){{
-    const tl=document.createElement('div'); tl.className='today-line';
-    tl.style.left=(LABEL_W+todayCol*COL_W+COL_W/2)+'px';
-    tl.style.height=(canvas.scrollHeight||2000)+'px';
-    canvas.appendChild(tl);
-  }}
 
   /* Deadline line */
   const dlCol=dateToCol(deadlineD);
