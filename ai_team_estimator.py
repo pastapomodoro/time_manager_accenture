@@ -1100,6 +1100,17 @@ body {{
   opacity: .92;
   z-index: 10;
 }}
+.g-bar.resizing {{ cursor: ew-resize; z-index: 10; }}
+.g-resize {{
+  position: absolute; right: 0; top: 0; width: 8px; height: 100%;
+  cursor: ew-resize; border-radius: 0 5px 5px 0;
+  background: rgba(255,255,255,.25);
+  display: flex; align-items: center; justify-content: center;
+}}
+.g-resize::after {{
+  content: ''; display: block; width: 2px; height: 12px;
+  background: rgba(255,255,255,.6); border-radius: 1px;
+}}
 .g-tooltip {{
   position: fixed; background: #1F2937; color: #fff;
   padding: 6px 10px; border-radius: 6px; font-size: 11px;
@@ -1171,71 +1182,117 @@ const state = TASKS.map(t => ({{
 }}));
 
 state.forEach((t, idx) => {{
-  const durMs = t.endD - t.startD;
-
-  const row   = document.createElement('div'); row.className = 'g-row';
-  const label = document.createElement('div'); label.className = 'g-label';
+  const row    = document.createElement('div'); row.className = 'g-row';
+  const label  = document.createElement('div'); label.className = 'g-label';
   label.textContent = t.name; label.title = t.name;
-  const track = document.createElement('div'); track.className = 'g-track';
-  const bar   = document.createElement('div'); bar.className = 'g-bar';
+  const track  = document.createElement('div'); track.className = 'g-track';
+  const bar    = document.createElement('div'); bar.className = 'g-bar';
+  const handle = document.createElement('div'); handle.className = 'g-resize';
 
-  function render() {{
-    bar.style.left  = msToLeftPct(t.startD).toFixed(3) + '%';
-    bar.style.width = durationPct(durMs).toFixed(3) + '%';
-    bar.style.background = t.color;
-    bar.textContent = t.days + 'd';
+  function calDays() {{
+    let d = new Date(t.startD); let n = 0;
+    while (d < t.endD) {{ d = new Date(d.getTime() + DAY_MS); if (d.getDay() !== 0 && d.getDay() !== 6) n++; }}
+    return n;
   }}
+  function render() {{
+    const durMs = t.endD - t.startD;
+    bar.style.left  = msToLeftPct(t.startD).toFixed(3) + '%';
+    bar.style.width = Math.max(durationPct(durMs), 0.5).toFixed(3) + '%';
+    bar.style.background = t.color;
+    labelEl.textContent = calDays() + 'd';
+  }}
+
+  // label inside bar (separate from resize handle)
+  const labelEl = document.createElement('span');
+  labelEl.style.cssText = 'pointer-events:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+  bar.appendChild(labelEl);
+  bar.appendChild(handle);
   render();
 
-  // ── Drag logic ──
-  let dragStartX = 0, dragStartLeft = 0;
+  function showTip(ev) {{
+    tip.style.display = 'block';
+    tip.style.left = (ev.clientX + 14) + 'px';
+    tip.style.top  = (ev.clientY - 10) + 'px';
+    tip.innerHTML  = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{calDays()}} working day(s)<br>${{t.assigned}}`;
+  }}
 
+  // ── Move (drag bar body) ──
   bar.addEventListener('mousedown', e => {{
+    if (e.target === handle) return;
     e.preventDefault();
     tip.style.display = 'none';
     bar.classList.add('dragging');
     const tw = track.getBoundingClientRect().width;
-    dragStartX    = e.clientX;
-    dragStartLeft = msToLeftPct(t.startD) / 100 * tw;
+    const startX    = e.clientX;
+    const startLeft = msToLeftPct(t.startD) / 100 * tw;
+    const durMs     = t.endD - t.startD;
 
     function onMove(ev) {{
-      const dx      = ev.clientX - dragStartX;
-      const newLeft = Math.max(0, dragStartLeft + dx);
+      const newLeft  = Math.max(0, startLeft + ev.clientX - startX);
       const newStart = snapToDay(pxToDate(track, newLeft));
-      const newEnd   = new Date(newStart.getTime() + durMs);
       t.startD = newStart;
-      t.endD   = newEnd;
+      t.endD   = new Date(newStart.getTime() + durMs);
       render();
-      // live tooltip while dragging
       tip.style.display = 'block';
       tip.style.left = (ev.clientX + 14) + 'px';
       tip.style.top  = (ev.clientY - 10) + 'px';
-      tip.innerHTML  = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{t.days}} working day(s)`;
+      tip.innerHTML  = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{calDays()}} working day(s)`;
     }}
-
     function onUp() {{
       bar.classList.remove('dragging');
       tip.style.display = 'none';
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     }}
-
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   }});
 
-  // Hover tooltip (when not dragging)
+  // ── Resize (drag right handle) ──
+  handle.addEventListener('mousedown', e => {{
+    e.preventDefault();
+    e.stopPropagation();
+    tip.style.display = 'none';
+    bar.classList.add('resizing');
+    const tw       = track.getBoundingClientRect().width;
+    const trackLeft = track.getBoundingClientRect().left;
+    const minMs    = DAY_MS;
+
+    function onMove(ev) {{
+      const rightPx  = Math.max(ev.clientX - trackLeft, 0);
+      const newEnd   = snapToDay(pxToDate(track, rightPx));
+      if (newEnd - t.startD >= minMs) {{
+        t.endD = newEnd;
+        render();
+      }}
+      tip.style.display = 'block';
+      tip.style.left = (ev.clientX + 14) + 'px';
+      tip.style.top  = (ev.clientY - 10) + 'px';
+      tip.innerHTML  = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{calDays()}} working day(s)`;
+    }}
+    function onUp() {{
+      bar.classList.remove('resizing');
+      tip.style.display = 'none';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }}
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }});
+
+  // Hover tooltip
   bar.addEventListener('mouseenter', e => {{
-    if (bar.classList.contains('dragging')) return;
-    tip.style.display = 'block';
-    tip.innerHTML = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{t.days}} working day(s)<br>${{t.assigned}}`;
+    if (bar.classList.contains('dragging') || bar.classList.contains('resizing')) return;
+    showTip(e);
   }});
   bar.addEventListener('mousemove', e => {{
+    if (bar.classList.contains('dragging') || bar.classList.contains('resizing')) return;
     tip.style.left = (e.clientX + 14) + 'px';
     tip.style.top  = (e.clientY - 10) + 'px';
   }});
   bar.addEventListener('mouseleave', () => {{
-    if (!bar.classList.contains('dragging')) tip.style.display = 'none';
+    if (!bar.classList.contains('dragging') && !bar.classList.contains('resizing'))
+      tip.style.display = 'none';
   }});
 
   track.appendChild(bar);
