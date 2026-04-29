@@ -1020,6 +1020,7 @@ def build_gantt_html(
     start_date,
     gantt_positions: dict,
     ore_giornata: float = 8.0,
+    deadline=None,
 ) -> str:
     import json as _json
     import math as _math
@@ -1063,16 +1064,24 @@ def build_gantt_html(
     if not tasks:
         return "<html><body></body></html>"
 
-    all_starts  = [_dt.date.fromisoformat(t["start"]) for t in tasks]
-    all_ends    = [_dt.date.fromisoformat(t["end"])   for t in tasks]
-    range_start = min(all_starts)
-    raw_span    = max((max(all_ends) - range_start).days, 1)
-    range_end   = range_start + _dt.timedelta(days=int(raw_span * 1.5) + 14)
-    total_days  = (range_end - range_start).days
+    all_starts   = [_dt.date.fromisoformat(t["start"]) for t in tasks]
+    all_ends     = [_dt.date.fromisoformat(t["end"])   for t in tasks]
+    range_start  = min(all_starts)
+    raw_span     = max((max(all_ends) - range_start).days, 1)
+    range_end_full = range_start + _dt.timedelta(days=int(raw_span * 1.5) + 14)
 
-    tasks_json      = _json.dumps(tasks)
-    range_start_iso = range_start.isoformat()
-    total_days_val  = total_days
+    # Deadline-cropped range
+    if deadline is not None:
+        range_end_crop = max(deadline, max(all_ends))
+    else:
+        range_end_crop = range_end_full
+
+    total_days_full = (range_end_full - range_start).days
+    total_days_crop = (range_end_crop - range_start).days
+
+    tasks_json       = _json.dumps(tasks)
+    range_start_iso  = range_start.isoformat()
+    deadline_iso     = deadline.isoformat() if deadline else range_end_crop.isoformat()
 
     return f"""<!DOCTYPE html>
 <html>
@@ -1212,7 +1221,13 @@ body {{ padding: 0 0 16px; margin: 0; }}
 </head>
 <body>
 <div class="g-outer">
-<div class="g-title">Timeline — drag to move · resize from right edge</div>
+<div style="display:flex;align-items:center;gap:14px;padding:8px 12px 6px;">
+  <span class="g-title" style="margin:0">Timeline — drag to move · resize from right edge</span>
+  <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#374151;cursor:pointer;white-space:nowrap;">
+    <input type="checkbox" id="cropToggle" checked style="width:15px;height:15px;cursor:pointer;accent-color:#2563EB;">
+    Crop to deadline
+  </label>
+</div>
 <div class="g-tooltip" id="tip"></div>
 <div class="g-scroll">
   <div class="g-canvas" id="canvas"></div>
@@ -1220,21 +1235,29 @@ body {{ padding: 0 0 16px; margin: 0; }}
 </div>
 
 <script>
-const TASKS       = {tasks_json};
-const RANGE_START = new Date('{range_start_iso}T00:00:00');
-const TOTAL_DAYS  = {total_days_val};
-const DAY_MS      = 86400000;
-const CANVAS_W    = 7000; // total fixed width px
-const LABEL_W     = 220;  // label column px
-const COL_W       = Math.floor((CANVAS_W - LABEL_W) / TOTAL_DAYS);
+const TASKS            = {tasks_json};
+const RANGE_START      = new Date('{range_start_iso}T00:00:00');
+const TOTAL_DAYS_CROP  = {total_days_crop};
+const TOTAL_DAYS_FULL  = {total_days_full};
+const DEADLINE_ISO     = '{deadline_iso}';
+const DAY_MS           = 86400000;
+const CANVAS_W         = 7000;
+const LABEL_W          = 220;
+
+let TOTAL_DAYS = TOTAL_DAYS_CROP; // default: cropped
+let COL_W      = Math.floor((CANVAS_W - LABEL_W) / TOTAL_DAYS);
 
 // Set CSS variables
 const canvas = document.getElementById('canvas');
-canvas.style.setProperty('--total-days', TOTAL_DAYS);
-canvas.style.setProperty('--col-w', COL_W + 'px');
-canvas.style.setProperty('--label-w', LABEL_W + 'px');
-canvas.style.width = CANVAS_W + 'px';
-canvas.style.minWidth = CANVAS_W + 'px';
+function applyCanvasSize() {{
+  COL_W = Math.floor((CANVAS_W - LABEL_W) / TOTAL_DAYS);
+  canvas.style.setProperty('--total-days', TOTAL_DAYS);
+  canvas.style.setProperty('--col-w', COL_W + 'px');
+  canvas.style.setProperty('--label-w', LABEL_W + 'px');
+  canvas.style.width = CANVAS_W + 'px';
+  canvas.style.minWidth = CANVAS_W + 'px';
+}}
+applyCanvasSize();
 
 const tip = document.getElementById('tip');
 
@@ -1257,7 +1280,14 @@ function calBdays(s, e) {{
 }}
 function isWeekend(d) {{ return d.getDay() === 0 || d.getDay() === 6; }}
 
+function rebuildGrid() {{
+  canvas.innerHTML = '';
+  applyCanvasSize();
+  buildGrid();
+}}
+
 // ── Build header ──────────────────────────────────────────────
+function buildGrid() {{
 
 // Corner
 const corner = document.createElement('div');
@@ -1303,8 +1333,9 @@ for (let i = 0; i < TOTAL_DAYS; i++) {{
 
 // ── Build task rows ───────────────────────────────────────────
 
-const ROW_BASE = 3; // first data row in grid (after 2 header rows)
+const ROW_BASE = 3;
 
+// state lives outside buildGrid so repositionBars can access it after rebuild
 const state = TASKS.map(t => ({{
   ...t,
   startD: new Date(t.start + 'T00:00:00'),
@@ -1449,14 +1480,30 @@ state.forEach((t, idx) => {{
 }});
 
 // Re-position bars after full layout paint
-window.addEventListener('load', () => state.forEach((t, idx) => {{
-  const bar = canvas.querySelectorAll('.g-bar')[idx];
-  const labelCell = canvas.querySelectorAll('.g-label-cell')[idx];
-  if (bar && labelCell) {{
-    const canvasRect = canvas.getBoundingClientRect();
-    bar.style.top = (labelCell.getBoundingClientRect().top - canvasRect.top + 5) + 'px';
-  }}
-}}));
+function repositionBars() {{
+  state.forEach((t, idx) => {{
+    const bar = canvas.querySelectorAll('.g-bar')[idx];
+    const labelCell = canvas.querySelectorAll('.g-label-cell')[idx];
+    if (bar && labelCell) {{
+      const canvasRect = canvas.getBoundingClientRect();
+      bar.style.top = (labelCell.getBoundingClientRect().top - canvasRect.top + 8) + 'px';
+    }}
+  }});
+}}
+
+}} // end buildGrid
+
+// Initial build
+buildGrid();
+setTimeout(repositionBars, 50);
+window.addEventListener('load', repositionBars);
+
+// ── Crop toggle ──
+document.getElementById('cropToggle').addEventListener('change', function() {{
+  TOTAL_DAYS = this.checked ? TOTAL_DAYS_CROP : TOTAL_DAYS_FULL;
+  rebuildGrid();
+  setTimeout(repositionBars, 50);
+}});
 </script>
 </body>
 </html>"""
@@ -2322,6 +2369,7 @@ with tab_job:
             job_items=job_items,
             start_date=start_date,
             gantt_positions=st.session_state.gantt_positions,
+            deadline=deadline_value,
         )
         gantt_height = len(job_items) * 64 + 220
         components.html(gantt_html, height=gantt_height, scrolling=True)
