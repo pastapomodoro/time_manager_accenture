@@ -2258,20 +2258,20 @@ with tab_job:
     with s2:
         deadline_value = st.date_input("Deadline", value=deadline_default, key="job_deadline")
     with s3:
-        full_team = st.checkbox("ACN SONG ITA", value=True, key="job_full_team",
-                                help="Use the entire team on this job")
-        if full_team:
+        st.markdown("**Team on job**")
+        with st.expander("Select teams", expanded=False):
+            acn_checked  = st.checkbox("ACN SONG ITA", value=True, key="team_grp_acn")
+            subco_checked = st.checkbox("Subcontractors", value=False, key="team_grp_subco")
+        acn_names   = [n for n in tutti_nomi_internal]
+        _subco_nomi = list(subco_names)
+        team_scope  = []
+        if acn_checked:
+            team_scope += acn_names
+        if subco_checked:
+            team_scope += _subco_nomi
+        if not team_scope:
             team_scope = tutti_nomi
-        else:
-            team_scope = st.multiselect(
-                "Select members",
-                options=tutti_nomi,
-                default=team_scope_default if team_scope_default else tutti_nomi,
-                format_func=lambda n: (f"{initials(n)}  {n} (SUB)" if n in subco_names else (f"{initials(n)}  {n} (INT)" if n in intern_names else f"{initials(n)}  {n}")),
-                placeholder="Select who will work on this job…",
-                key="job_team_scope",
-            )
-        display_team_scope = team_scope or tutti_nomi
+        display_team_scope = team_scope
         st.markdown(compact_avatars_html(display_team_scope, color_map), unsafe_allow_html=True)
 
     nomi_disponibili_job = team_scope or tutti_nomi
