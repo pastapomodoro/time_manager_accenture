@@ -1111,7 +1111,7 @@ body {{ padding: 0 0 16px; margin: 0; }}
 .g-canvas {{
   display: grid;
   /* label col + N day cols */
-  grid-template-columns: 190px repeat(var(--total-days), var(--col-w));
+  grid-template-columns: var(--label-w) repeat(var(--total-days), var(--col-w));
   grid-template-rows: auto auto;  /* month row + day row */
 }}
 
@@ -1224,12 +1224,17 @@ const TASKS       = {tasks_json};
 const RANGE_START = new Date('{range_start_iso}T00:00:00');
 const TOTAL_DAYS  = {total_days_val};
 const DAY_MS      = 86400000;
-const COL_W       = 40; // px per day
+const CANVAS_W    = 7000; // total fixed width px
+const LABEL_W     = 220;  // label column px
+const COL_W       = Math.floor((CANVAS_W - LABEL_W) / TOTAL_DAYS);
 
 // Set CSS variables
 const canvas = document.getElementById('canvas');
 canvas.style.setProperty('--total-days', TOTAL_DAYS);
 canvas.style.setProperty('--col-w', COL_W + 'px');
+canvas.style.setProperty('--label-w', LABEL_W + 'px');
+canvas.style.width = CANVAS_W + 'px';
+canvas.style.minWidth = CANVAS_W + 'px';
 
 const tip = document.getElementById('tip');
 
@@ -1348,7 +1353,7 @@ state.forEach((t, idx) => {{
   function render() {{
     const col   = Math.max(0, dateToCol(t.startD));
     const durD  = Math.max(1, Math.round((t.endD - t.startD) / DAY_MS));
-    bar.style.left   = (190 + col * COL_W) + 'px';
+    bar.style.left   = (LABEL_W + col * COL_W) + 'px';
     bar.style.width  = Math.max(durD * COL_W, COL_W) + 'px';
     barLbl.textContent = calBdays(t.startD, t.endD) + 'd';
   }}
@@ -2318,7 +2323,7 @@ with tab_job:
             start_date=start_date,
             gantt_positions=st.session_state.gantt_positions,
         )
-        gantt_height = max(600, len(job_items) * 64 + 220)
+        gantt_height = len(job_items) * 64 + 220
         components.html(gantt_html, height=gantt_height, scrolling=True)
         if st.button("↺ Reset timeline to sequential", key="gantt_reset"):
             st.session_state.gantt_positions = {}
