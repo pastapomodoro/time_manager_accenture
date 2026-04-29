@@ -1111,9 +1111,9 @@ body {{ padding: 0 0 16px; margin: 0; }}
   padding: 10px 0 8px 12px;
 }}
 .g-scroll {{
-  overflow-x: auto;
-  overflow-y: visible;
+  overflow: hidden;
   flex: 1;
+  width: 100%;
 }}
 
 /* ── Fixed-pixel grid ── */
@@ -1241,21 +1241,22 @@ const TOTAL_DAYS_CROP  = {total_days_crop};
 const TOTAL_DAYS_FULL  = {total_days_full};
 const DEADLINE_ISO     = '{deadline_iso}';
 const DAY_MS           = 86400000;
-const CANVAS_W         = 7000;
 const LABEL_W          = 220;
 
-let TOTAL_DAYS = TOTAL_DAYS_CROP; // default: cropped
-let COL_W      = Math.floor((CANVAS_W - LABEL_W) / TOTAL_DAYS);
+let TOTAL_DAYS = TOTAL_DAYS_CROP;
+let COL_W      = 20; // will be computed from container width
 
-// Set CSS variables
 const canvas = document.getElementById('canvas');
+
 function applyCanvasSize() {{
-  COL_W = Math.floor((CANVAS_W - LABEL_W) / TOTAL_DAYS);
+  // Fit exactly to the scroll container width
+  const scrollEl = canvas.parentElement;
+  const availW   = scrollEl.clientWidth || window.innerWidth;
+  COL_W = Math.max(4, Math.floor((availW - LABEL_W) / TOTAL_DAYS));
   canvas.style.setProperty('--total-days', TOTAL_DAYS);
   canvas.style.setProperty('--col-w', COL_W + 'px');
   canvas.style.setProperty('--label-w', LABEL_W + 'px');
-  canvas.style.width = CANVAS_W + 'px';
-  canvas.style.minWidth = CANVAS_W + 'px';
+  canvas.style.width  = (LABEL_W + TOTAL_DAYS * COL_W) + 'px';
 }}
 applyCanvasSize();
 
@@ -1496,7 +1497,13 @@ function repositionBars() {{
 // Initial build
 buildGrid();
 setTimeout(repositionBars, 50);
-window.addEventListener('load', repositionBars);
+window.addEventListener('load', () => {{ applyCanvasSize(); rebuildGrid(); setTimeout(repositionBars, 50); }});
+
+// Re-fit on container resize
+if (window.ResizeObserver) {{
+  new ResizeObserver(() => {{ applyCanvasSize(); rebuildGrid(); setTimeout(repositionBars, 30); }})
+    .observe(canvas.parentElement);
+}}
 
 // ── Crop toggle ──
 document.getElementById('cropToggle').addEventListener('change', function() {{
@@ -2372,7 +2379,7 @@ with tab_job:
             deadline=deadline_value,
         )
         gantt_height = len(job_items) * 64 + 220
-        components.html(gantt_html, height=gantt_height, scrolling=True)
+        components.html(gantt_html, height=gantt_height, scrolling=False)
         if st.button("↺ Reset timeline to sequential", key="gantt_reset"):
             st.session_state.gantt_positions = {}
             st.rerun()
