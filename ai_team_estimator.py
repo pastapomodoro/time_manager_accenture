@@ -246,6 +246,21 @@ ORE_GIORNATA     = 8.0
 RETRY_MULTIPLIER = 4
 SUBCO_COLOR      = "#EC4899"
 
+GANTT_COLORS: dict[str, str] = {
+    "GENERATION":       "#3B82F6",
+    "POST-PRODUCTION":  "#EC4899",
+    "ANIMATION":        "#EAB308",
+    "COLOR CORRECTION": "#F97316",
+    "EDITING":          "#8B5CF6",
+}
+GANTT_COLOR_DEFAULT = "#6B7280"
+
+def gantt_color(fase: str) -> str:
+    for key, color in GANTT_COLORS.items():
+        if key in (fase or "").upper():
+            return color
+    return GANTT_COLOR_DEFAULT
+
 _XLSX_ENV = os.environ.get("AI_TEAM_DATA_XLSX", "").strip()
 DEFAULT_XLSX = (
     os.path.abspath(os.path.expanduser(os.path.normpath(_XLSX_ENV)))
@@ -513,6 +528,7 @@ ICO_CHECK  = _ico('<polyline points="20 6 9 17 4 12"/>', color="var(--success)")
 ICO_FILE   = _ico('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>')
 ICO_WRENCH = _ico('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>')
 ICO_SUBCO  = _ico('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/>')
+ICO_CALENDAR = _ico('<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>')
 
 
 # ── HELPERS ───────────────────────────────────────────────────
@@ -667,8 +683,11 @@ def preset_to_editor_rows(preset_data: dict, df_lav: pd.DataFrame) -> list[dict]
     if isinstance(preset_data.get("rows"), list):
         return preset_data["rows"]
 
+    meta_cols = ["nome_lavorazione", "skill_richiesta", "minuti_per_unita"]
+    if "sottocategoria" in df_lav.columns:
+        meta_cols.insert(1, "sottocategoria")
     meta_map = (
-        df_lav[["nome_lavorazione", "sottocategoria", "skill_richiesta", "minuti_per_unita"]]
+        df_lav[meta_cols]
         .drop_duplicates(subset=["nome_lavorazione"])
         .set_index("nome_lavorazione")
         .to_dict("index")
@@ -705,7 +724,8 @@ def build_editor_rows(df_lav: pd.DataFrame, preset_rows: list[dict]) -> pd.DataF
     """Crea la tabella stile Excel unendo catalogo base e righe custom del preset."""
     base_rows = [
         {
-            "sottocategoria": row["sottocategoria"],
+            # `sottocategoria` is optional in the uploaded template.
+            "sottocategoria": str(row.get("sottocategoria", "CUSTOM")).strip() or "CUSTOM",
             "nome_lavorazione": row["nome_lavorazione"],
             "skill_richiesta": row["skill_richiesta"],
             "unita_ora": round(60 / row["minuti_per_unita"], 1),
@@ -754,10 +774,15 @@ def load_lavorazioni(file_bytes: bytes) -> pd.DataFrame:
     if "lavorazioni" not in xls.sheet_names:
         raise ValueError("Sheet 'lavorazioni' not found")
     df = pd.read_excel(xls, sheet_name="lavorazioni")
-    req = {"tipologia_id","sottocategoria","nome_lavorazione","minuti_per_unita","skill_richiesta"}
-    miss = req - set(df.columns)
+    # Template semplificato: l'utente compila solo questi campi.
+    # Colonne legacy (es. `tipologia_id`, `categoria`) vengono ignorate.
+    required = {"nome_lavorazione", "minuti_per_unita", "skill_richiesta"}
+    miss = required - set(df.columns)
     if miss:
         raise ValueError(f"Missing columns in 'lavorazioni': {miss}")
+
+    if "sottocategoria" not in df.columns:
+        df["sottocategoria"] = "CUSTOM"
     df["minuti_per_unita"] = pd.to_numeric(df["minuti_per_unita"], errors="coerce")
     if "costo_per_unita_eur" not in df.columns:
         df["costo_per_unita_eur"] = 0.0
@@ -780,6 +805,42 @@ def load_team_from_excel(file_bytes: bytes) -> list[dict]:
         df["costo_ucr"] = pd.to_numeric(df.get("costo_ucr", 0), errors="coerce").fillna(0)
     df["disponibilita_h_settimana"] = pd.to_numeric(df["disponibilita_h_settimana"], errors="coerce")
     df = df.dropna(subset=["costo_lcr"]).reset_index(drop=True)
+    return df.to_dict("records")
+
+@st.cache_data
+def load_subcontractors_from_excel(file_bytes: bytes) -> list[dict] | None:
+    """Returns:
+    - None if the sheet is missing (don't override current subcontractors)
+    - [] if the sheet exists but is empty
+    - list[dict] if rows are present
+    """
+    xls = pd.ExcelFile(BytesIO(file_bytes))
+    if "subcontractors" not in xls.sheet_names:
+        return None
+
+    df = pd.read_excel(xls, sheet_name="subcontractors")
+    # Expected columns in app editor:
+    # ["nome","ruolo","costo_orario","skill_tags","disponibilita_h_settimana"]
+    required = {"nome", "costo_orario", "skill_tags", "disponibilita_h_settimana"}
+    miss = required - set(df.columns)
+    if miss:
+        raise ValueError(f"Missing columns in 'subcontractors': {miss}")
+
+    if "ruolo" not in df.columns:
+        df["ruolo"] = ""
+
+    df["nome"] = df["nome"].astype(str).str.strip()
+    df = df[df["nome"] != ""].copy()
+    df["costo_orario"] = pd.to_numeric(df["costo_orario"], errors="coerce").fillna(0.0)
+    df["disponibilita_h_settimana"] = pd.to_numeric(
+        df["disponibilita_h_settimana"], errors="coerce"
+    ).fillna(40.0)
+    # Ensure fields exist for the editor.
+    if "skill_tags" not in df.columns:
+        df["skill_tags"] = ""
+    if "ruolo" not in df.columns:
+        df["ruolo"] = ""
+
     return df.to_dict("records")
 
 def get_team_df() -> pd.DataFrame:
@@ -855,40 +916,208 @@ def build_export_excel(nome_progetto, job_items, ore_pp, costo_pp_internal, cost
 
 
 def build_template_excel(source_bytes: bytes | None = None) -> bytes:
+    # Normalize the downloadable template so the user sees only the columns
+    # that must be filled (even if Supabase storage still contains the old template).
+    keep_cols = ["nome_lavorazione", "minuti_per_unita", "skill_richiesta", "costo_per_unita_eur"]
+    keep_subco_cols = ["nome", "ruolo", "costo_orario", "skill_tags", "disponibilita_h_settimana"]
+
+    default_tasks = pd.DataFrame([
+        {"nome_lavorazione": "AI Image Generation", "minuti_per_unita": 60, "skill_richiesta": "prompt", "costo_per_unita_eur": 0.22},
+        {"nome_lavorazione": "Image Post-production", "minuti_per_unita": 48, "skill_richiesta": "retouch", "costo_per_unita_eur": 0.0},
+        {"nome_lavorazione": "Photo Color Correction", "minuti_per_unita": 30, "skill_richiesta": "color", "costo_per_unita_eur": 0.0},
+        {"nome_lavorazione": "Static Frame Animation", "minuti_per_unita": 90, "skill_richiesta": "motion", "costo_per_unita_eur": 0.0},
+        {"nome_lavorazione": "Animation Post-production", "minuti_per_unita": 40, "skill_richiesta": "editing", "costo_per_unita_eur": 0.0},
+        {"nome_lavorazione": "AI Video Generation", "minuti_per_unita": 120, "skill_richiesta": "prompt", "costo_per_unita_eur": 3.68},
+        {"nome_lavorazione": "Video Post-production", "minuti_per_unita": 60, "skill_richiesta": "editing", "costo_per_unita_eur": 0.0},
+        {"nome_lavorazione": "Video Color Correction", "minuti_per_unita": 45, "skill_richiesta": "color", "costo_per_unita_eur": 0.0},
+    ])
+
+    default_team = pd.DataFrame([
+        {
+            "id": 1,
+            "nome": "Name Surname",
+            "ruolo": "Senior Graphic Designer",
+            "seniority": "senior",
+            "costo_lcr": 15,
+            "costo_ucr": 10,
+            "skill_tags": "prompt,retouch",
+            "disponibilita_h_settimana": 40,
+        }
+    ])
+
+    default_subco = pd.DataFrame(columns=keep_subco_cols)
+
+    df_lav = default_tasks
+    df_team = default_team
+    df_subco = default_subco
+
     if source_bytes:
-        return source_bytes
+        try:
+            xls = pd.ExcelFile(BytesIO(source_bytes))
+            if "lavorazioni" in xls.sheet_names:
+                df_in = pd.read_excel(xls, sheet_name="lavorazioni")
+                # Keep only user-fillable columns.
+                for c in keep_cols:
+                    if c not in df_in.columns:
+                        df_in[c] = 0 if c in ("minuti_per_unita", "costo_per_unita_eur") else ""
+                df_lav = df_in[keep_cols]
+            if "team" in xls.sheet_names:
+                df_team = pd.read_excel(xls, sheet_name="team")
+            if "subcontractors" in xls.sheet_names:
+                df_sub = pd.read_excel(xls, sheet_name="subcontractors")
+                for c in keep_subco_cols:
+                    if c not in df_sub.columns:
+                        df_sub[c] = "" if c in ("nome", "ruolo", "skill_tags") else 0
+                df_subco = df_sub[keep_subco_cols]
+        except Exception:
+            # Fallback to built-in defaults.
+            df_lav = default_tasks
+            df_team = default_team
+            df_subco = default_subco
+
+    df_instructions = pd.DataFrame([
+        {"sheet": "lavorazioni", "note": "Fill tasks catalogue (only these columns): `nome_lavorazione`, `minuti_per_unita` (min/unit), `skill_richiesta`, `costo_per_unita_eur` (API/production cost per unit)."},
+        {"sheet": "team", "note": "Fill team. `costo_lcr` = chargeable rate, `costo_ucr` = BD/internal rate. `disponibilita_h_settimana` must be numeric. Set role to 'Intern' for zero-cost members."},
+        {"sheet": "subcontractors", "note": "Fill subcontractors (these columns): `nome`, `ruolo`, `costo_orario` (€/h LCR), `skill_tags`, `disponibilita_h_settimana` (H/week)."},
+    ])
 
     buf = BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
-        pd.DataFrame([
-            {"tipologia_id":"CAT-001","sottocategoria":"GENERATION","nome_lavorazione":"AI Image Generation","minuti_per_unita":60,"skill_richiesta":"prompt","costo_per_unita_eur":0.22},
-            {"tipologia_id":"CAT-002","sottocategoria":"POST-PRODUCTION","nome_lavorazione":"Image Post-production","minuti_per_unita":48,"skill_richiesta":"retouch","costo_per_unita_eur":0.0},
-            {"tipologia_id":"CAT-003","sottocategoria":"COLOR CORRECTION","nome_lavorazione":"Photo Color Correction","minuti_per_unita":30,"skill_richiesta":"color","costo_per_unita_eur":0.0},
-            {"tipologia_id":"CAT-004","sottocategoria":"GENERATION","nome_lavorazione":"Static Frame Animation","minuti_per_unita":90,"skill_richiesta":"motion","costo_per_unita_eur":0.0},
-            {"tipologia_id":"CAT-005","sottocategoria":"ANIMATION","nome_lavorazione":"Animation Post-production","minuti_per_unita":40,"skill_richiesta":"editing","costo_per_unita_eur":0.0},
-            {"tipologia_id":"CAT-006","sottocategoria":"GENERATION","nome_lavorazione":"AI Video Generation","minuti_per_unita":120,"skill_richiesta":"prompt","costo_per_unita_eur":3.68},
-            {"tipologia_id":"CAT-007","sottocategoria":"POST-PRODUCTION","nome_lavorazione":"Video Post-production","minuti_per_unita":60,"skill_richiesta":"editing","costo_per_unita_eur":0.0},
-            {"tipologia_id":"CAT-008","sottocategoria":"COLOR CORRECTION","nome_lavorazione":"Video Color Correction","minuti_per_unita":45,"skill_richiesta":"color","costo_per_unita_eur":0.0},
-        ]).to_excel(w, sheet_name="lavorazioni", index=False)
-
-        pd.DataFrame([
-            {
-                "id": 1,
-                "nome": "Name Surname",
-                "ruolo": "Senior Graphic Designer",
-                "seniority": "senior",
-                "costo_lcr": 15,
-                "costo_ucr": 10,
-                "skill_tags": "prompt,retouch",
-                "disponibilita_h_settimana": 40,
-            }
-        ]).to_excel(w, sheet_name="team", index=False)
-
-        pd.DataFrame([
-            {"sheet": "lavorazioni", "note": "Fill tasks catalogue. `minuti_per_unita` must be numeric. `costo_per_unita_eur` is the API/production cost per unit (0 if no API cost)."},
-            {"sheet": "team", "note": "Fill team. `costo_lcr` = chargeable rate, `costo_ucr` = BD/internal rate. `disponibilita_h_settimana` must be numeric. Set role to 'Intern' for zero-cost members."},
-        ]).to_excel(w, sheet_name="_instructions", index=False)
+        df_lav.to_excel(w, sheet_name="lavorazioni", index=False)
+        df_team.to_excel(w, sheet_name="team", index=False)
+        df_subco.to_excel(w, sheet_name="subcontractors", index=False)
+        df_instructions.to_excel(w, sheet_name="_instructions", index=False)
     return buf.getvalue()
+
+
+# ── GANTT TIMELINE HTML ───────────────────────────────────────
+def build_gantt_html(
+    job_items: list[dict],
+    start_date,
+    gantt_positions: dict,
+    ore_giornata: float = 8.0,
+) -> str:
+    import json as _json
+    import math as _math
+    import numpy as _np
+
+    tasks = []
+    cursor = start_date
+
+    for i, it in enumerate(job_items):
+        task_id = f"task_{i}"
+        ore_reali = it["quantita"] / max(it["uph"], 0.001) / max(len(it["assigned"]), 1)
+        giorni = max(_math.ceil(ore_reali / ore_giornata), 1)
+
+        if task_id in gantt_positions:
+            t_start = gantt_positions[task_id]["start"]
+            t_end   = gantt_positions[task_id]["end"]
+        else:
+            t_start = cursor.strftime("%Y-%m-%d")
+            t_end   = _np.busday_offset(cursor, giorni, roll="forward").astype(str)
+            cursor  = _np.busday_offset(cursor, giorni, roll="forward").astype(object)
+
+        tasks.append({
+            "id":       task_id,
+            "name":     it["nome"][:30],
+            "start":    t_start,
+            "end":      t_end,
+            "progress": 0,
+            "color":    gantt_color(it["fase"]),
+        })
+
+    tasks_json = _json.dumps(tasks)
+
+    color_css = "\n".join(
+        f".bar-{fase.lower().replace(' ', '-')[:20]} .bar {{ fill: {color} !important; }}"
+        for fase, color in GANTT_COLORS.items()
+    )
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css">
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ background: transparent; font-family: 'Inter', system-ui, sans-serif; }}
+  #gantt-container {{ padding: 8px 0 12px; }}
+  .gantt-title {{
+    font-size: 0.78rem; font-weight: 600; letter-spacing: .06em;
+    color: #6B7280; text-transform: uppercase; margin-bottom: 10px; padding-left: 4px;
+  }}
+  .gantt .bar-label {{ font-size: 11px !important; }}
+  .gantt .bar {{ rx: 4; }}
+  {color_css}
+  .gantt .bar {{ fill: {GANTT_COLOR_DEFAULT}; }}
+  .gantt .bar-progress {{ fill: transparent !important; }}
+  .view-btns {{ display:flex; gap:6px; margin-bottom:8px; padding-left:4px; }}
+  .view-btn {{
+    font-size:11px; padding:3px 10px; border-radius:100px; border:1px solid #D1D5DB;
+    background:white; cursor:pointer; color:#374151; font-weight:500;
+  }}
+  .view-btn.active {{ background:#111827; color:white; border-color:#111827; }}
+</style>
+</head>
+<body>
+<div id="gantt-container">
+  <div class="gantt-title">Timeline — drag bars to set parallelism</div>
+  <div class="view-btns">
+    <button class="view-btn active" onclick="setView('Day', this)">Day</button>
+    <button class="view-btn" onclick="setView('Week', this)">Week</button>
+    <button class="view-btn" onclick="setView('Month', this)">Month</button>
+  </div>
+  <div id="gantt"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.umd.js"></script>
+<script>
+  const TASKS = {tasks_json};
+  function applyColors() {{
+    TASKS.forEach((t, i) => {{
+      const bars = document.querySelectorAll('.bar-wrapper');
+      if (bars[i]) {{
+        const rect = bars[i].querySelector('.bar');
+        if (rect) rect.setAttribute('fill', t.color);
+      }}
+    }});
+  }}
+  const gantt = new Gantt('#gantt', TASKS, {{
+    view_mode: 'Day',
+    date_format: 'YYYY-MM-DD',
+    column_width: 38,
+    bar_height: 28,
+    bar_corner_radius: 4,
+    arrow_curve: 5,
+    padding: 12,
+    view_mode_select: false,
+    readonly: false,
+    move_dependencies: false,
+    on_date_change: function(task, start, end) {{
+      window.parent.postMessage({{
+        type: 'gantt_update',
+        task_id: task.id,
+        new_start: start.toISOString().split('T')[0],
+        new_end:   end.toISOString().split('T')[0],
+      }}, '*');
+    }},
+    on_view_change: function() {{ setTimeout(applyColors, 100); }},
+    custom_popup_html: function(task) {{
+      return `<div style="padding:8px 12px;font-size:12px;max-width:200px">
+        <strong>${{task.name}}</strong><br>
+        ${{task.start}} → ${{task.end}}
+      </div>`;
+    }},
+  }});
+  setTimeout(applyColors, 200);
+  function setView(mode, btn) {{
+    gantt.change_view_mode(mode);
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    setTimeout(applyColors, 200);
+  }}
+</script>
+</body>
+</html>"""
 
 
 # ── RESULTS DASHBOARD HTML ────────────────────────────────────
@@ -1414,6 +1643,17 @@ with st.sidebar:
             )
             if up:
                 uploaded_bytes = up.getvalue()
+
+                # If the uploaded Excel includes a `subcontractors` sheet,
+                # sync it into the app storage so "Assigned to" includes them.
+                try:
+                    subco_from_xlsx = load_subcontractors_from_excel(uploaded_bytes)
+                    if subco_from_xlsx is not None:
+                        save_subcontractors(subco_from_xlsx)
+                        st.toast("Subcontractors synced from Excel")
+                except Exception as e:
+                    st.warning(f"Subcontractors sync skipped: {e}")
+
                 if _USE_SUPABASE:
                     upload_xlsx_to_storage(uploaded_bytes)
                     st.cache_data.clear()
@@ -1730,7 +1970,23 @@ with tab_job:
                     presets[pname.strip()] = snap; save_presets(presets)
                 st.success(f"Preset «{pname.strip()}» saved")
 
-    # ── Results ──
+    # ── Gantt Timeline ──
+    if job_items:
+        st.divider()
+        st.markdown(f'<div class="sec-hdr">{ICO_CALENDAR} Timeline</div>', unsafe_allow_html=True)
+        if "gantt_positions" not in st.session_state:
+            st.session_state.gantt_positions = {}
+        gantt_html = build_gantt_html(
+            job_items=job_items,
+            start_date=start_date,
+            gantt_positions=st.session_state.gantt_positions,
+        )
+        gantt_height = max(280, len(job_items) * 52 + 120)
+        components.html(gantt_html, height=gantt_height, scrolling=False)
+        if st.button("↺ Reset timeline to sequential", key="gantt_reset"):
+            st.session_state.gantt_positions = {}
+            st.rerun()
+
     # ── Deliverables override ──
     st.divider()
     st.markdown(f'<div class="sec-hdr">{ICO_CLIP} Deliverables</div>', unsafe_allow_html=True)
@@ -1806,6 +2062,24 @@ with tab_job:
             if ore_persona > 0:
                 giorni_per_persona.append(ore_persona / ORE_GIORNATA)
         giorni_cal = max(giorni_per_persona) if giorni_per_persona else None
+
+        # ── Gantt calendar override ──────────────────────────────
+        if st.session_state.get("gantt_positions"):
+            import numpy as _np_gc
+            try:
+                end_dates = [
+                    pos["end"]
+                    for pos in st.session_state.gantt_positions.values()
+                    if pos.get("end")
+                ]
+                if end_dates:
+                    last_end    = max(end_dates)
+                    first_start = start_date.strftime("%Y-%m-%d")
+                    gantt_days  = int(_np_gc.busday_count(first_start, last_end))
+                    if gantt_days > 0:
+                        giorni_cal = float(gantt_days)
+            except Exception:
+                pass
 
         phase_df = pd.DataFrame(phase_rows)
         if not phase_df.empty:
