@@ -2243,8 +2243,9 @@ with tab_job:
     # ── Job type (LCR / UCR) ──
     chargeable_default = bool(preset_meta.get("chargeable", True))
     st.markdown(f'<div class="sec-hdr" style="font-size:1.0rem">{ICO_WRENCH} Job settings</div>', unsafe_allow_html=True)
-    job_type_col, s1, s2, s3 = st.columns([1.5, 1.1, 1.1, 2.8], vertical_alignment="bottom")
+    job_type_col, s1, s2, s3 = st.columns([1.5, 1.1, 1.1, 2.8], vertical_alignment="top")
     with job_type_col:
+        st.markdown('<div style="height:26px"></div>', unsafe_allow_html=True)
         job_type = st.radio(
             "Project type",
             options=["Chargeable (LCR)", "BD / Internal (UCR)"],
@@ -2258,7 +2259,7 @@ with tab_job:
     with s2:
         deadline_value = st.date_input("Deadline", value=deadline_default, key="job_deadline")
     with s3:
-        st.markdown("**Team on job**", unsafe_allow_html=True)
+        st.markdown("**Team on job**")
         with st.expander("Select teams", expanded=False):
             acn_checked  = st.checkbox("ACN SONG ITA", value=True, key="team_grp_acn")
             subco_checked = st.checkbox("Subcontractors", value=False, key="team_grp_subco")
