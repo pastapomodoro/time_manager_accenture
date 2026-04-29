@@ -1066,13 +1066,13 @@ def build_gantt_html(
     all_starts  = [_dt.date.fromisoformat(t["start"]) for t in tasks]
     all_ends    = [_dt.date.fromisoformat(t["end"])   for t in tasks]
     range_start = min(all_starts)
-    # Pad right by 20% so there's empty space to drag bars into
     raw_span    = max((max(all_ends) - range_start).days, 1)
-    range_end   = range_start + _dt.timedelta(days=int(raw_span * 1.4) + 7)
+    range_end   = range_start + _dt.timedelta(days=int(raw_span * 1.5) + 14)
+    total_days  = (range_end - range_start).days
 
     tasks_json      = _json.dumps(tasks)
     range_start_iso = range_start.isoformat()
-    range_end_iso   = range_end.isoformat()
+    total_days_val  = total_days
 
     return f"""<!DOCTYPE html>
 <html>
@@ -1080,125 +1080,224 @@ def build_gantt_html(
 <meta charset="utf-8">
 <style>
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-body {{
+html, body {{
   background: #fff;
   font-family: 'Inter', system-ui, sans-serif;
-  padding: 12px 8px 16px;
   user-select: none;
+  height: 100%;
+}}
+body {{ padding: 0 0 12px; }}
+
+/* ── Layout ── */
+.g-outer {{
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }}
 .g-title {{
   font-size: 0.72rem; font-weight: 700; letter-spacing: .08em;
-  color: #9CA3AF; text-transform: uppercase; margin-bottom: 10px;
+  color: #9CA3AF; text-transform: uppercase;
+  padding: 10px 0 8px 12px;
 }}
-.g-wrap {{ overflow-x: auto; }}
-.g-grid {{ min-width: 600px; }}
-.g-header {{ display: flex; margin-bottom: 4px; padding-left: 180px; border-bottom: 1px solid #F3F4F6; padding-bottom: 4px; }}
-.g-hcell {{
-  font-size: 10px; color: #9CA3AF; font-weight: 600;
-  flex-shrink: 0; padding: 0 2px;
+.g-scroll {{
+  overflow-x: auto;
+  overflow-y: visible;
+  flex: 1;
 }}
-.g-row {{ display: flex; align-items: center; margin-bottom: 5px; }}
-.g-label {{
-  width: 176px; min-width: 176px; font-size: 11px; font-weight: 500;
-  color: #374151; padding-right: 10px; overflow: hidden;
-  white-space: nowrap; text-overflow: ellipsis;
+
+/* ── Fixed-pixel grid ── */
+.g-canvas {{
+  display: grid;
+  /* label col + N day cols */
+  grid-template-columns: 190px repeat(var(--total-days), var(--col-w));
+  grid-template-rows: auto auto;  /* month row + day row */
 }}
-.g-track {{
-  flex: 1; position: relative; height: 30px;
-  background: #F9FAFB; border-radius: 4px;
-  overflow: visible;
-}}
-.g-bar {{
-  position: absolute; height: 30px; border-radius: 5px;
-  display: flex; align-items: center; padding: 0 8px;
-  font-size: 10px; font-weight: 700; color: #fff;
+
+/* Month header cells */
+.g-month {{
+  border-bottom: 2px solid #E5E7EB;
+  border-right: 1px solid #E5E7EB;
+  padding: 4px 8px;
+  font-size: 11px; font-weight: 700; color: #374151;
+  background: #F9FAFB;
   white-space: nowrap; overflow: hidden;
+}}
+.g-month:first-child {{ border-radius: 6px 0 0 0; }}
+
+/* Day header cells */
+.g-day {{
+  border-bottom: 2px solid #E5E7EB;
+  border-right: 1px solid #F3F4F6;
+  padding: 3px 0;
+  font-size: 9px; font-weight: 600; color: #9CA3AF;
+  text-align: center;
+  background: #FAFAFA;
+}}
+.g-day.weekend {{ background: #F3F4F6; color: #D1D5DB; }}
+.g-day.today   {{ background: #EFF6FF; color: #2563EB; font-weight: 800; }}
+
+/* Corner label cell (spans both header rows) */
+.g-corner {{
+  grid-column: 1;
+  grid-row: 1 / 3;
+  border-bottom: 2px solid #E5E7EB;
+  border-right: 2px solid #E5E7EB;
+  background: #F9FAFB;
+  display: flex; align-items: flex-end; padding: 6px 10px;
+  font-size: 10px; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: .06em;
+}}
+
+/* Task rows */
+.g-row {{
+  display: contents;
+}}
+.g-label-cell {{
+  grid-column: 1;
+  display: flex; align-items: center;
+  padding: 4px 10px 4px 12px;
+  font-size: 11px; font-weight: 500; color: #374151;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border-right: 2px solid #E5E7EB;
+  border-bottom: 1px solid #F3F4F6;
+  background: #fff;
+  min-height: 40px;
+}}
+.g-track-cell {{
+  position: relative;
+  border-bottom: 1px solid #F3F4F6;
+  border-right: 1px solid #F3F4F6;
+  background: #fff;
+  min-height: 40px;
+}}
+.g-track-cell.weekend {{ background: #FAFAFA; }}
+
+/* Bars */
+.g-bar {{
+  position: absolute;
+  top: 5px; height: 30px;
+  border-radius: 5px;
+  display: flex; align-items: center; padding: 0 8px 0 8px;
+  font-size: 10px; font-weight: 700; color: #fff;
   cursor: grab;
-  box-shadow: 0 1px 4px rgba(0,0,0,.18);
-  transition: box-shadow .1s;
-  z-index: 2;
+  box-shadow: 0 1px 4px rgba(0,0,0,.20);
+  z-index: 4;
+  overflow: visible;
+  white-space: nowrap;
 }}
-.g-bar.dragging {{
-  cursor: grabbing;
-  box-shadow: 0 4px 16px rgba(0,0,0,.28);
-  opacity: .92;
-  z-index: 10;
-}}
-.g-bar.resizing {{ cursor: ew-resize; z-index: 10; }}
+.g-bar.dragging  {{ cursor: grabbing; box-shadow: 0 4px 16px rgba(0,0,0,.28); opacity:.92; z-index:10; }}
+.g-bar.resizing  {{ cursor: ew-resize; z-index:10; }}
+.g-bar-label {{ pointer-events:none; overflow:hidden; text-overflow:ellipsis; flex:1; }}
 .g-resize {{
   position: absolute; right: 0; top: 0; width: 8px; height: 100%;
   cursor: ew-resize; border-radius: 0 5px 5px 0;
-  background: rgba(255,255,255,.25);
-  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.2);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }}
 .g-resize::after {{
-  content: ''; display: block; width: 2px; height: 12px;
-  background: rgba(255,255,255,.6); border-radius: 1px;
+  content:''; display:block; width:2px; height:12px;
+  background:rgba(255,255,255,.65); border-radius:1px;
 }}
+
+/* Tooltip */
 .g-tooltip {{
   position: fixed; background: #1F2937; color: #fff;
-  padding: 6px 10px; border-radius: 6px; font-size: 11px;
+  padding: 7px 12px; border-radius: 7px; font-size: 11px;
   pointer-events: none; display: none; z-index: 9999;
-  white-space: nowrap; line-height: 1.7;
+  white-space: nowrap; line-height: 1.8;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
 }}
 </style>
 </head>
 <body>
-<div class="g-title">Timeline — drag bars to set parallelism</div>
+<div class="g-outer">
+<div class="g-title">Timeline — drag to move · resize from right edge</div>
 <div class="g-tooltip" id="tip"></div>
-<div class="g-wrap">
-  <div class="g-grid" id="grid"></div>
+<div class="g-scroll">
+  <div class="g-canvas" id="canvas"></div>
 </div>
+</div>
+
 <script>
 const TASKS       = {tasks_json};
 const RANGE_START = new Date('{range_start_iso}T00:00:00');
-const RANGE_END   = new Date('{range_end_iso}T00:00:00');
-const TOTAL_MS    = RANGE_END - RANGE_START;
+const TOTAL_DAYS  = {total_days_val};
 const DAY_MS      = 86400000;
+const COL_W       = 28; // px per day
 
-function msToLeftPct(ms) {{
-  return Math.max(0, (ms - RANGE_START) / TOTAL_MS * 100);
+// Set CSS variables
+const canvas = document.getElementById('canvas');
+canvas.style.setProperty('--total-days', TOTAL_DAYS);
+canvas.style.setProperty('--col-w', COL_W + 'px');
+
+const tip = document.getElementById('tip');
+
+function dateToCol(d) {{
+  return Math.round((d - RANGE_START) / DAY_MS);
 }}
-function durationPct(ms) {{
-  return ms / TOTAL_MS * 100;
-}}
-function pxToDate(trackEl, px) {{
-  const tw = trackEl.getBoundingClientRect().width;
-  const ratio = Math.max(0, Math.min(1, px / tw));
-  return new Date(RANGE_START.getTime() + ratio * TOTAL_MS);
+function colToDate(col) {{
+  return new Date(RANGE_START.getTime() + col * DAY_MS);
 }}
 function snapToDay(d) {{
-  const ms = Math.round(d.getTime() / DAY_MS) * DAY_MS;
-  return new Date(ms);
+  return new Date(Math.round(d.getTime() / DAY_MS) * DAY_MS);
 }}
 function fmtDate(d) {{
   return d.toISOString().split('T')[0];
 }}
-function addBdays(d, n) {{
-  let cur = new Date(d); let added = 0;
-  while (added < n) {{ cur = new Date(cur.getTime() + DAY_MS); if (cur.getDay() !== 0 && cur.getDay() !== 6) added++; }}
-  return cur;
+function calBdays(s, e) {{
+  let d = new Date(s); let n = 0;
+  while (d < e) {{ d = new Date(d.getTime() + DAY_MS); if (d.getDay() && d.getDay() < 6) n++; }}
+  return n;
+}}
+function isWeekend(d) {{ return d.getDay() === 0 || d.getDay() === 6; }}
+
+// ── Build header ──────────────────────────────────────────────
+
+// Corner
+const corner = document.createElement('div');
+corner.className = 'g-corner';
+corner.textContent = 'Task';
+canvas.appendChild(corner);
+
+// Month row — group consecutive days by month
+let monthSpanStart = 0;
+let prevMonth = new Date(RANGE_START.getTime()).getMonth();
+
+function flushMonth(spanEnd, label) {{
+  const cell = document.createElement('div');
+  cell.className = 'g-month';
+  cell.style.gridColumn = `${{monthSpanStart + 2}} / ${{spanEnd + 2}}`;
+  cell.style.gridRow = '1';
+  cell.textContent = label;
+  canvas.appendChild(cell);
 }}
 
-// Build weekly header
-const grid = document.getElementById('grid');
-const tip  = document.getElementById('tip');
-
-(function buildHeader() {{
-  const h = document.createElement('div'); h.className = 'g-header';
-  const cur = new Date(RANGE_START);
-  while (cur < RANGE_END) {{
-    const next = new Date(cur.getTime() + 7 * DAY_MS);
-    const cell = document.createElement('div'); cell.className = 'g-hcell';
-    cell.style.width = durationPct(Math.min(next, RANGE_END) - cur).toFixed(2) + '%';
-    cell.textContent = cur.toLocaleDateString('en-GB', {{day:'2-digit', month:'short'}});
-    h.appendChild(cell);
-    cur.setDate(cur.getDate() + 7);
+for (let i = 0; i <= TOTAL_DAYS; i++) {{
+  const d = new Date(RANGE_START.getTime() + i * DAY_MS);
+  const m = d.getMonth();
+  if (m !== prevMonth || i === TOTAL_DAYS) {{
+    const labelDate = new Date(RANGE_START.getTime() + monthSpanStart * DAY_MS);
+    flushMonth(i, labelDate.toLocaleDateString('en-GB', {{month:'long', year:'numeric'}}));
+    monthSpanStart = i;
+    prevMonth = m;
   }}
-  grid.appendChild(h);
-}})();
+}}
 
-// State per task
+// Day row
+const today = new Date(); today.setHours(0,0,0,0);
+for (let i = 0; i < TOTAL_DAYS; i++) {{
+  const d = new Date(RANGE_START.getTime() + i * DAY_MS);
+  const cell = document.createElement('div');
+  cell.className = 'g-day' + (isWeekend(d) ? ' weekend' : '') + (d.getTime() === today.getTime() ? ' today' : '');
+  cell.style.gridColumn = `${{i + 2}}`;
+  cell.style.gridRow = '2';
+  cell.textContent = d.getDate();
+  canvas.appendChild(cell);
+}}
+
+// ── Build task rows ───────────────────────────────────────────
+
+const ROW_BASE = 3; // first data row in grid (after 2 header rows)
+
 const state = TASKS.map(t => ({{
   ...t,
   startD: new Date(t.start + 'T00:00:00'),
@@ -1206,61 +1305,88 @@ const state = TASKS.map(t => ({{
 }}));
 
 state.forEach((t, idx) => {{
-  const row    = document.createElement('div'); row.className = 'g-row';
-  const label  = document.createElement('div'); label.className = 'g-label';
-  label.textContent = t.name; label.title = t.name;
-  const track  = document.createElement('div'); track.className = 'g-track';
-  const bar    = document.createElement('div'); bar.className = 'g-bar';
-  const handle = document.createElement('div'); handle.className = 'g-resize';
+  const gridRow = ROW_BASE + idx;
 
-  function calDays() {{
-    let d = new Date(t.startD); let n = 0;
-    while (d < t.endD) {{ d = new Date(d.getTime() + DAY_MS); if (d.getDay() !== 0 && d.getDay() !== 6) n++; }}
-    return n;
+  // Label cell
+  const labelCell = document.createElement('div');
+  labelCell.className = 'g-label-cell';
+  labelCell.style.gridColumn = '1';
+  labelCell.style.gridRow = String(gridRow);
+  labelCell.textContent = t.name;
+  labelCell.title = t.name;
+  canvas.appendChild(labelCell);
+
+  // Day track cells (one per day, for the grid background)
+  for (let i = 0; i < TOTAL_DAYS; i++) {{
+    const d = new Date(RANGE_START.getTime() + i * DAY_MS);
+    const cell = document.createElement('div');
+    cell.className = 'g-track-cell' + (isWeekend(d) ? ' weekend' : '');
+    cell.style.gridColumn = String(i + 2);
+    cell.style.gridRow = String(gridRow);
+    canvas.appendChild(cell);
+  }}
+
+  // Bar — absolutely positioned over the first track cell of its start column
+  // We attach it to the canvas and position with left offset in px
+  const bar    = document.createElement('div'); bar.className = 'g-bar';
+  const barLbl = document.createElement('span'); barLbl.className = 'g-bar-label';
+  const handle = document.createElement('div'); handle.className = 'g-resize';
+  bar.appendChild(barLbl);
+  bar.appendChild(handle);
+  bar.style.background = t.color;
+  // Position bar relative to canvas; top = header rows height (approx 56px) + row index * row height
+  bar.style.position = 'absolute';
+
+  function rowTop() {{
+    // Find the label cell's top relative to canvas
+    const canvasRect = canvas.getBoundingClientRect();
+    const cellRect   = labelCell.getBoundingClientRect();
+    return cellRect.top - canvasRect.top + 5;
   }}
   function render() {{
-    const durMs = t.endD - t.startD;
-    bar.style.left  = msToLeftPct(t.startD).toFixed(3) + '%';
-    bar.style.width = Math.max(durationPct(durMs), 0.5).toFixed(3) + '%';
-    bar.style.background = t.color;
-    labelEl.textContent = calDays() + 'd';
+    const col   = Math.max(0, dateToCol(t.startD));
+    const durD  = Math.max(1, Math.round((t.endD - t.startD) / DAY_MS));
+    bar.style.left   = (190 + col * COL_W) + 'px';
+    bar.style.width  = Math.max(durD * COL_W, COL_W) + 'px';
+    barLbl.textContent = calBdays(t.startD, t.endD) + 'd';
   }}
 
-  // label inside bar (separate from resize handle)
-  const labelEl = document.createElement('span');
-  labelEl.style.cssText = 'pointer-events:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-  bar.appendChild(labelEl);
-  bar.appendChild(handle);
-  render();
+  canvas.style.position = 'relative';
+  canvas.appendChild(bar);
+
+  // Position vertically after layout
+  function positionBar() {{
+    bar.style.top = rowTop() + 'px';
+  }}
+  setTimeout(positionBar, 0);
 
   function showTip(ev) {{
     tip.style.display = 'block';
-    tip.style.left = (ev.clientX + 14) + 'px';
-    tip.style.top  = (ev.clientY - 10) + 'px';
-    tip.innerHTML  = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{calDays()}} working day(s)<br>${{t.assigned}}`;
+    tip.style.left = (ev.clientX + 16) + 'px';
+    tip.style.top  = (ev.clientY - 12) + 'px';
+    tip.innerHTML = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{calBdays(t.startD,t.endD)}} working days<br><span style="opacity:.7">${{t.assigned}}</span>`;
   }}
 
-  // ── Move (drag bar body) ──
+  // ── Move ──
   bar.addEventListener('mousedown', e => {{
-    if (e.target === handle) return;
+    if (e.target === handle || e.target.classList.contains('g-resize')) return;
     e.preventDefault();
-    tip.style.display = 'none';
     bar.classList.add('dragging');
-    const tw = track.getBoundingClientRect().width;
-    const startX    = e.clientX;
-    const startLeft = msToLeftPct(t.startD) / 100 * tw;
-    const durMs     = t.endD - t.startD;
+    tip.style.display = 'none';
+    const durMs   = t.endD - t.startD;
+    const startX  = e.clientX;
+    const startCol = dateToCol(t.startD);
 
     function onMove(ev) {{
-      const newLeft  = Math.max(0, startLeft + ev.clientX - startX);
-      const newStart = snapToDay(pxToDate(track, newLeft));
-      t.startD = newStart;
-      t.endD   = new Date(newStart.getTime() + durMs);
+      const dx     = ev.clientX - startX;
+      const newCol = Math.max(0, startCol + Math.round(dx / COL_W));
+      t.startD = colToDate(newCol);
+      t.endD   = new Date(t.startD.getTime() + durMs);
       render();
       tip.style.display = 'block';
-      tip.style.left = (ev.clientX + 14) + 'px';
-      tip.style.top  = (ev.clientY - 10) + 'px';
-      tip.innerHTML  = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{calDays()}} working day(s)`;
+      tip.style.left = (ev.clientX + 16) + 'px';
+      tip.style.top  = (ev.clientY - 12) + 'px';
+      tip.innerHTML = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{calBdays(t.startD,t.endD)}} working days`;
     }}
     function onUp() {{
       bar.classList.remove('dragging');
@@ -1272,27 +1398,23 @@ state.forEach((t, idx) => {{
     document.addEventListener('mouseup', onUp);
   }});
 
-  // ── Resize (drag right handle) ──
+  // ── Resize ──
   handle.addEventListener('mousedown', e => {{
-    e.preventDefault();
-    e.stopPropagation();
-    tip.style.display = 'none';
+    e.preventDefault(); e.stopPropagation();
     bar.classList.add('resizing');
-    const tw       = track.getBoundingClientRect().width;
-    const trackLeft = track.getBoundingClientRect().left;
-    const minMs    = DAY_MS;
+    tip.style.display = 'none';
+    const startX   = e.clientX;
+    const startDur = Math.round((t.endD - t.startD) / DAY_MS);
 
     function onMove(ev) {{
-      const rightPx  = Math.max(ev.clientX - trackLeft, 0);
-      const newEnd   = snapToDay(pxToDate(track, rightPx));
-      if (newEnd - t.startD >= minMs) {{
-        t.endD = newEnd;
-        render();
-      }}
+      const dx     = ev.clientX - startX;
+      const newDur = Math.max(1, startDur + Math.round(dx / COL_W));
+      t.endD = new Date(t.startD.getTime() + newDur * DAY_MS);
+      render();
       tip.style.display = 'block';
-      tip.style.left = (ev.clientX + 14) + 'px';
-      tip.style.top  = (ev.clientY - 10) + 'px';
-      tip.innerHTML  = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{calDays()}} working day(s)`;
+      tip.style.left = (ev.clientX + 16) + 'px';
+      tip.style.top  = (ev.clientY - 12) + 'px';
+      tip.innerHTML = `<b>${{t.name}}</b><br>${{fmtDate(t.startD)}} → ${{fmtDate(t.endD)}}<br>${{calBdays(t.startD,t.endD)}} working days`;
     }}
     function onUp() {{
       bar.classList.remove('resizing');
@@ -1304,26 +1426,30 @@ state.forEach((t, idx) => {{
     document.addEventListener('mouseup', onUp);
   }});
 
-  // Hover tooltip
-  bar.addEventListener('mouseenter', e => {{
-    if (bar.classList.contains('dragging') || bar.classList.contains('resizing')) return;
-    showTip(e);
-  }});
+  // Hover
+  bar.addEventListener('mouseenter', showTip);
   bar.addEventListener('mousemove', e => {{
     if (bar.classList.contains('dragging') || bar.classList.contains('resizing')) return;
-    tip.style.left = (e.clientX + 14) + 'px';
-    tip.style.top  = (e.clientY - 10) + 'px';
+    tip.style.left = (e.clientX + 16) + 'px';
+    tip.style.top  = (e.clientY - 12) + 'px';
   }});
   bar.addEventListener('mouseleave', () => {{
     if (!bar.classList.contains('dragging') && !bar.classList.contains('resizing'))
       tip.style.display = 'none';
   }});
 
-  track.appendChild(bar);
-  row.appendChild(label);
-  row.appendChild(track);
-  grid.appendChild(row);
+  render();
 }});
+
+// Re-position bars after full layout paint
+window.addEventListener('load', () => state.forEach((t, idx) => {{
+  const bar = canvas.querySelectorAll('.g-bar')[idx];
+  const labelCell = canvas.querySelectorAll('.g-label-cell')[idx];
+  if (bar && labelCell) {{
+    const canvasRect = canvas.getBoundingClientRect();
+    bar.style.top = (labelCell.getBoundingClientRect().top - canvasRect.top + 5) + 'px';
+  }}
+}}));
 </script>
 </body>
 </html>"""
@@ -2190,7 +2316,7 @@ with tab_job:
             start_date=start_date,
             gantt_positions=st.session_state.gantt_positions,
         )
-        gantt_height = max(280, len(job_items) * 52 + 120)
+        gantt_height = max(320, len(job_items) * 48 + 140)
         components.html(gantt_html, height=gantt_height, scrolling=False)
         if st.button("↺ Reset timeline to sequential", key="gantt_reset"):
             st.session_state.gantt_positions = {}
