@@ -867,7 +867,7 @@ def load_subcontractors_from_excel(file_bytes: bytes) -> list[dict] | None:
 
     return df.to_dict("records")
 
-def get_team_df() -> pd.DataFrame:
+def get_team_df(file_bytes: bytes | None = None) -> pd.DataFrame:
     """Priority: profiles.json > Excel. Always normalises costo_lcr/costo_ucr."""
     profiles = load_profiles()
     if profiles is not None:
@@ -910,9 +910,9 @@ def build_export_excel(nome_progetto, job_items, ore_pp, costo_pp_internal, cost
         pd.DataFrame([{
             "Task": it["nome"], "Qty": it["quantita"],
             "Units/hr": it["uph"],
-            "Base hours": round(it["quantita"]/it["uph"], 2),
-            "Real hours": round(it["quantita"]/it["uph"]/max(len(it["assigned"]),1), 2),
-            "Working days": round(it["quantita"]/it["uph"]/max(len(it["assigned"]),1)/ORE_GIORNATA, 2),
+            "Base hours": round(it["quantita"]/max(it["uph"], 0.001), 2),
+            "Real hours": round(it["quantita"]/max(it["uph"], 0.001)/max(len(it["assigned"]),1), 2),
+            "Working days": round(it["quantita"]/max(it["uph"], 0.001)/max(len(it["assigned"]),1)/ORE_GIORNATA, 2),
             "Assigned to": ", ".join(it["assigned"]),
             "Prod cost (API) €": round(it.get("prod_cost", 0), 2),
         } for it in job_items]).to_excel(w, sheet_name="Tasks", index=False)
@@ -1571,7 +1571,7 @@ def build_results_html(
     # Pre-compute LCR totals (always needed for the toggle)
     int_total_lcr = sum(costo_pp_internal.values())
     sub_total     = sum(costo_pp_subco.values())
-    effort_h      = sum(it["quantita"] / it["uph"] for it in job_items)
+    effort_h      = sum(it["quantita"] / max(it["uph"], 0.001) for it in job_items)
     elapsed_h     = sum(ore_pp.values())
     cal_days      = math.ceil(giorni_cal) if giorni_cal else 0
     total_qty_assets = sum(it["quantita"] for it in job_items) or 1
@@ -1620,7 +1620,7 @@ def build_results_html(
     task_rows_js = []
     for it in job_items:
         fase = str(it.get("nome","")).strip() or str(it.get("fase","")).strip() or "OTHER"
-        base_h = it["quantita"] / it["uph"]
+        base_h = it["quantita"] / max(it["uph"], 0.001)
         prod_c = it.get("prod_cost",0.0)
         phase_map[fase] = phase_map.get(fase,0) + base_h
         task_rows_js.append({
@@ -2131,7 +2131,7 @@ with st.sidebar:
     # Team legend
     st.divider()
     st.markdown("**Team**")
-    df_team_side = get_team_df()
+    df_team_side = get_team_df(file_bytes)
     if not df_team_side.empty:
         color_map_side = {row["nome"]: PALETTE[i % len(PALETTE)]
                          for i, row in df_team_side.iterrows()}
@@ -2167,7 +2167,7 @@ tab_job, tab_profili, tab_subco = st.tabs(["Build Job", "Team Profiles", "Subcon
 # TAB 1 — BUILD JOB
 # ════════════════════════════════════════════════════════════════
 with tab_job:
-    df_team = get_team_df()
+    df_team = get_team_df(file_bytes)
     subco_list = load_subcontractors()
     subco_names = {s["nome"] for s in subco_list}
     subco_rate_map = {s["nome"]: clean_float(s.get("costo_orario", 0)) for s in subco_list}
@@ -2446,8 +2446,8 @@ with tab_job:
         prod_cost_total = 0.0
 
         for it in job_items:
-            ob  = it["quantita"] / it["uph"]
-            n   = len(it["assigned"])
+            ob  = it["quantita"] / max(it["uph"], 0.001)
+            n   = max(len(it["assigned"]), 1)
             or_ = ob / n
             ore_base_tot   += ob
             ore_effort_tot += ob
