@@ -2028,17 +2028,20 @@ function printWithCharts(){{
     c.style.display = 'none';
     snapshots.push({{canvas:c, img}});
   }});
-  // Small delay so browser paints images before print dialog
-  setTimeout(()=>{{
-    window.print();
-    // Restore after print (works for both Cancel and Print)
-    setTimeout(()=>{{
-      snapshots.forEach(s=>{{
-        s.canvas.style.display = '';
-        s.img.remove();
-      }});
-    }}, 1000);
-  }}, 120);
+  // Double RAF + 300ms ensures browser fully paints frozen images before dialog
+  requestAnimationFrame(()=>{{
+    requestAnimationFrame(()=>{{
+      setTimeout(()=>{{
+        window.print();
+        setTimeout(()=>{{
+          snapshots.forEach(s=>{{
+            s.canvas.style.display = '';
+            s.img.remove();
+          }});
+        }}, 1000);
+      }}, 300);
+    }});
+  }});
 }}
 
 // ── Init ──
@@ -2409,7 +2412,7 @@ with tab_job:
                     save_preset_db(pname.strip(), snap)
                 else:
                     presets[pname.strip()] = snap; save_presets(presets)
-                st.success(f"Preset «{pname.strip()}» saved")
+                st.toast(f"Preset «{pname.strip()}» saved", icon="✅")
 
     # ── Gantt Timeline ──
     if job_items:
@@ -2680,7 +2683,7 @@ with tab_profili:
         clean["id"] = range(1, len(clean)+1)
         save_profiles(clean.to_dict("records"))
         load_team_from_excel.clear()
-        st.success("Profiles saved")
+        st.toast("Profiles saved", icon="✅")
         st.rerun()
 
     if not _USE_SUPABASE:
@@ -2766,7 +2769,7 @@ with tab_subco:
             clean_s["disponibilita_h_settimana"], errors="coerce").fillna(40)
         clean_s["id"] = range(1, len(clean_s)+1)
         save_subcontractors(clean_s.to_dict("records"))
-        st.success("Subcontractors saved")
+        st.toast("Subcontractors saved", icon="✅")
         st.rerun()
 
     if not _USE_SUPABASE:
