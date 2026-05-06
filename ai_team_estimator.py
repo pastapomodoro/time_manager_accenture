@@ -3,7 +3,7 @@ AI_Team Estimator — stima tempi e costi per AI_Team, Accenture Song.
 Run: python3 -m streamlit run ai_team_estimator.py
 """
 
-import os, json, html, math
+import os, json, html, math, base64
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -1021,6 +1021,7 @@ def build_gantt_html(
     gantt_positions: dict,
     ore_giornata: float = 8.0,
     deadline=None,
+    color_overrides: dict | None = None,
 ) -> str:
     import json as _json
     import math as _math
@@ -1051,26 +1052,26 @@ def build_gantt_html(
             t_end   = _add_bdays(cursor, giorni)
             cursor  = t_end
 
+        _color = (color_overrides or {}).get(it["fase"]) or gantt_color(it["nome"], it["fase"])
         tasks.append({
             "id":       task_id,
             "name":     it["nome"],
             "start":    t_start.isoformat(),
             "end":      t_end.isoformat(),
             "days":     giorni,
-            "color":    gantt_color(it["nome"], it["fase"]),
+            "color":    _color,
             "assigned": ", ".join(it["assigned"]) if it["assigned"] else "—",
         })
 
     if not tasks:
         return "<html><body></body></html>"
 
-    all_starts   = [_dt.date.fromisoformat(t["start"]) for t in tasks]
-    all_ends     = [_dt.date.fromisoformat(t["end"])   for t in tasks]
-    range_start  = min(all_starts)
+    all_ends     = [_dt.date.fromisoformat(t["end"]) for t in tasks]
+    range_start  = start_date if start_date else _dt.date.fromisoformat(tasks[0]["start"])
     raw_span     = max((max(all_ends) - range_start).days, 1)
     range_end_full = range_start + _dt.timedelta(days=int(raw_span * 1.5) + 14)
 
-    # Deadline-cropped range
+    # Deadline-cropped range: use deadline as the right edge; show all tasks even if they exceed it
     if deadline is not None:
         range_end_crop = max(deadline, max(all_ends))
     else:
@@ -1115,7 +1116,7 @@ html,body{{height:100%;width:100%;background:#F8F9FB;font-family:'Inter',system-
 .leg-dot{{width:10px;height:10px;border-radius:3px;flex-shrink:0}}
 
 /* ─── Scroll wrapper ──────────────────────────────── */
-.g-scroll{{overflow:hidden;width:100%}}
+.g-scroll{{overflow-x:auto;overflow-y:hidden;width:100%;-webkit-overflow-scrolling:touch}}
 
 /* ─── Grid canvas ─────────────────────────────────── */
 .g-canvas{{
@@ -1264,6 +1265,17 @@ html,body{{height:100%;width:100%;background:#F8F9FB;font-family:'Inter',system-
 .g-tip b{{color:#fff;font-size:13px;display:block;margin-bottom:2px}}
 .g-tip .tip-row{{display:flex;align-items:center;gap:6px;color:#94A3B8}}
 .g-tip .tip-dot{{width:8px;height:8px;border-radius:2px;flex-shrink:0}}
+
+/* ─── Mobile ──────────────────────────────────────── */
+@media(max-width:600px){{
+  .g-lc-name{{font-size:11px}}
+  .g-lc-sub{{display:none}}
+  .g-avatars{{display:none}}
+  .g-bar{{font-size:10px;padding:0 6px}}
+  .g-bar-days{{display:none}}
+  .toolbar{{gap:6px;padding:8px 10px;flex-wrap:wrap}}
+  .legend{{display:none}}
+}}
 </style>
 </head>
 <body>
@@ -1291,7 +1303,8 @@ const TOTAL_DAYS_CROP = {total_days_crop};
 const TOTAL_DAYS_FULL = {total_days_full};
 const DEADLINE_ISO    = '{deadline_iso}';
 const DAY_MS          = 86400000;
-const LABEL_W         = 240;
+const IS_MOBILE       = window.innerWidth < 600;
+const LABEL_W         = IS_MOBILE ? 130 : 240;
 const ROW_H           = 64;
 const BAR_TOP         = 12;
 const BAR_H           = 40;
@@ -1515,6 +1528,41 @@ function buildGrid(){{
       if(!bar.classList.contains('dragging')&&!bar.classList.contains('resizing'))
         tip.style.display='none';
     }});
+
+    /* Touch — move */
+    bar.addEventListener('touchstart',e=>{{
+      if(e.target===handle||e.target.classList.contains('g-handle')) return;
+      const touch=e.touches[0]; const durMs=t.endD-t.startD;
+      const sx=touch.clientX, sc=dateToCol(t.startD);
+      bar.classList.add('dragging');
+      function mv(ev){{
+        ev.preventDefault();
+        const nc=Math.max(0,sc+Math.round((ev.touches[0].clientX-sx)/COL_W));
+        t.startD=colToDate(nc); t.endD=new Date(t.startD.getTime()+durMs); render();
+      }}
+      function up(){{
+        bar.classList.remove('dragging');
+        document.removeEventListener('touchmove',mv); document.removeEventListener('touchend',up);
+      }}
+      document.addEventListener('touchmove',mv,{{passive:false}}); document.addEventListener('touchend',up);
+    }},{{passive:true}});
+
+    /* Touch — resize */
+    handle.addEventListener('touchstart',e=>{{
+      e.stopPropagation(); const touch=e.touches[0];
+      const sx=touch.clientX, sd=Math.round((t.endD-t.startD)/DAY_MS);
+      bar.classList.add('resizing');
+      function mv(ev){{
+        ev.preventDefault();
+        const nd=Math.max(1,sd+Math.round((ev.touches[0].clientX-sx)/COL_W));
+        t.endD=new Date(t.startD.getTime()+nd*DAY_MS); render();
+      }}
+      function up(){{
+        bar.classList.remove('resizing');
+        document.removeEventListener('touchmove',mv); document.removeEventListener('touchend',up);
+      }}
+      document.addEventListener('touchmove',mv,{{passive:false}}); document.addEventListener('touchend',up);
+    }},{{passive:true}});
   }});
 
 
@@ -2119,7 +2167,12 @@ with st.sidebar:
 
     if not _USE_SUPABASE and uploaded_bytes:
         file_bytes = uploaded_bytes
-    st.caption("Replace current file or download the template.")
+    # Per-preset Excel override (set when loading a preset that has an embedded Excel)
+    if st.session_state.get("preset_excel_bytes"):
+        file_bytes = st.session_state.preset_excel_bytes
+        st.caption("Excel loaded from preset.")
+    else:
+        st.caption("Replace current file or download the template.")
 
     if not file_bytes:
         st.info("Upload the Excel file to get started.")
@@ -2195,7 +2248,7 @@ with tab_job:
         nome_progetto = st.text_input("Project name", placeholder="e.g. Nike FW25 — Video Campaign",
                                       label_visibility="collapsed")
     with top_r:
-        pc = st.columns([4, 1, 0.7])
+        pc = st.columns([4, 1, 1, 0.7])
         preset_options = ["— none —"] + list(presets.keys())
         saved_sel = st.session_state.get("preset_sel", "— none —")
         sel_index = preset_options.index(saved_sel) if saved_sel in preset_options else 0
@@ -2203,16 +2256,29 @@ with tab_job:
                                        index=sel_index,
                                        label_visibility="collapsed")
         load_clicked = pc[1].button("Load", use_container_width=True)
-        del_clicked  = pc[2].button("X", use_container_width=True, help="Delete selected preset")
+        save_current_clicked = pc[2].button("💾", use_container_width=True, help="Save to current preset",
+                                             disabled=(saved_sel == "— none —"))
+        del_clicked  = pc[3].button("X", use_container_width=True, help="Delete selected preset")
 
     if "preset_data" not in st.session_state:
         st.session_state.preset_data = {}
     if "job_editor_version" not in st.session_state:
         st.session_state.job_editor_version = 0
+    if "gantt_phase_colors" not in st.session_state:
+        st.session_state.gantt_phase_colors = {}
     if load_clicked and preset_sel != "— none —":
-        st.session_state.preset_data = presets[preset_sel]
+        pdata = presets[preset_sel]
+        st.session_state.preset_data = pdata
         st.session_state.preset_sel = preset_sel
         st.session_state.job_editor_version += 1
+        # Restore per-preset Excel if embedded
+        _pmeta = pdata.get("meta", {}) or {}
+        if _pmeta.get("excel_b64"):
+            st.session_state.preset_excel_bytes = base64.b64decode(_pmeta["excel_b64"])
+        else:
+            st.session_state.pop("preset_excel_bytes", None)
+        # Restore gantt color overrides
+        st.session_state.gantt_phase_colors = _pmeta.get("gantt_phase_colors", {})
         st.toast(f"Preset «{preset_sel}» loaded")
         st.rerun()
     if del_clicked and preset_sel != "— none —":
@@ -2222,9 +2288,14 @@ with tab_job:
             del presets[preset_sel]; save_presets(presets)
         st.session_state.preset_sel = "— none —"
         st.session_state.preset_data = {}
+        st.session_state.pop("preset_excel_bytes", None)
+        st.session_state.pop("gantt_phase_colors", None)
         st.session_state.job_editor_version += 1
         st.toast(f"Preset «{preset_sel}» deleted")
         st.rerun()
+
+    # Deferred save-to-current: handled below after active_rows is built
+    _save_current_preset_name = saved_sel if save_current_clicked and saved_sel != "— none —" else None
 
     pd_data = st.session_state.preset_data
     preset_meta = preset_to_meta(pd_data)
@@ -2375,44 +2446,60 @@ with tab_job:
                 "prod_cost": prod_cost,
             })
 
-    # ── Save preset ──
-    with st.expander("Save as preset"):
+    def _build_snap(snap_name: str) -> dict:
+        snap_rows = []
+        for _, row in active_rows.iterrows():
+            _nome = str(row["nome_lavorazione"]).strip()
+            if not _nome:
+                continue
+            snap_rows.append({
+                "sottocategoria": str(row.get("sottocategoria", "")).strip() or "CUSTOM",
+                "nome_lavorazione": _nome,
+                "skill_richiesta": str(row.get("skill_richiesta", "")).strip(),
+                "unita_ora": clean_float(row.get("unita_ora", 0)),
+                "quantita": clean_int(row.get("quantita", 0)),
+                "assegnato_a": str(row.get("assegnato_a", "")).strip(),
+            })
+        _meta: dict = {
+            "start_date": start_date.isoformat(),
+            "deadline": deadline_value.isoformat(),
+            "team_scope": team_scope,
+            "chargeable": chargeable,
+            "gantt_phase_colors": st.session_state.get("gantt_phase_colors", {}),
+        }
+        # Embed current Excel file so this preset stays self-contained
+        _fb = st.session_state.get("preset_excel_bytes") or file_bytes
+        if _fb:
+            _meta["excel_b64"] = base64.b64encode(_fb).decode()
+        return {"meta": _meta, "rows": snap_rows}
+
+    def _do_save_preset(pname: str):
+        if not pname.strip():
+            st.warning("Enter a preset name")
+            return
+        if active_rows.empty:
+            st.warning("No tasks to save")
+            return
+        snap = _build_snap(pname.strip())
+        if _USE_SUPABASE:
+            save_preset_db(pname.strip(), snap)
+        else:
+            presets[pname.strip()] = snap; save_presets(presets)
+        st.session_state.preset_sel = pname.strip()
+        st.session_state.preset_data = snap
+        st.toast(f"Preset «{pname.strip()}» saved ✅")
+
+    # ── Save-to-current (💾 button) ──
+    if _save_current_preset_name:
+        _do_save_preset(_save_current_preset_name)
+
+    # ── Save as preset (new name) ──
+    with st.expander("Save as new preset"):
         sc = st.columns([3, 1])
         pname = sc[0].text_input("Name", value=nome_progetto or "",
                                   placeholder="e.g. Nike FW25", label_visibility="collapsed")
         if sc[1].button("Save", use_container_width=True):
-            if not pname.strip():
-                st.warning("Enter a preset name")
-            elif active_rows.empty:
-                st.warning("No tasks to save")
-            else:
-                snap_rows = []
-                for _, row in active_rows.iterrows():
-                    nome = str(row["nome_lavorazione"]).strip()
-                    if not nome:
-                        continue
-                    snap_rows.append({
-                        "sottocategoria": str(row.get("sottocategoria", "")).strip() or "CUSTOM",
-                        "nome_lavorazione": nome,
-                        "skill_richiesta": str(row.get("skill_richiesta", "")).strip(),
-                        "unita_ora": clean_float(row.get("unita_ora", 0)),
-                        "quantita": clean_int(row.get("quantita", 0)),
-                        "assegnato_a": str(row.get("assegnato_a", "")).strip(),
-                    })
-                snap = {
-                    "meta": {
-                        "start_date": start_date.isoformat(),
-                        "deadline": deadline_value.isoformat(),
-                        "team_scope": team_scope,
-                        "chargeable": chargeable,
-                    },
-                    "rows": snap_rows,
-                }
-                if _USE_SUPABASE:
-                    save_preset_db(pname.strip(), snap)
-                else:
-                    presets[pname.strip()] = snap; save_presets(presets)
-                st.toast(f"Preset «{pname.strip()}» saved", icon="✅")
+            _do_save_preset(pname)
 
     # ── Gantt Timeline ──
     if job_items:
@@ -2420,11 +2507,24 @@ with tab_job:
         st.markdown(f'<div class="sec-hdr">{ICO_CALENDAR} Timeline</div>', unsafe_allow_html=True)
         if "gantt_positions" not in st.session_state:
             st.session_state.gantt_positions = {}
+
+        # Color pickers per unique phase
+        unique_phases = list(dict.fromkeys(it["fase"] for it in job_items if it.get("fase")))
+        if unique_phases:
+            with st.expander("Customize bar colors", expanded=False):
+                _cols = st.columns(min(len(unique_phases), 4))
+                for _pi, _fase in enumerate(unique_phases):
+                    _default = st.session_state.gantt_phase_colors.get(_fase) or gantt_color("", _fase)
+                    _picked = _cols[_pi % 4].color_picker(_fase or "Default", value=_default,
+                                                           key=f"gcolor_{_fase}")
+                    st.session_state.gantt_phase_colors[_fase] = _picked
+
         gantt_html = build_gantt_html(
             job_items=job_items,
             start_date=start_date,
             gantt_positions=st.session_state.gantt_positions,
             deadline=deadline_value,
+            color_overrides=st.session_state.get("gantt_phase_colors", {}),
         )
         gantt_height = len(job_items) * 72 + 100
         components.html(gantt_html, height=gantt_height, scrolling=False)
