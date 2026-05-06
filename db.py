@@ -139,12 +139,13 @@ def load_xlsx_from_storage() -> bytes | None:
 
 def upload_xlsx_to_storage(file_bytes: bytes):
     sb = get_supabase()
-    try:
-        sb.storage.from_(BUCKET).remove([XLSX_PATH])
-    except Exception:
-        pass
-    sb.storage.from_(BUCKET).upload(XLSX_PATH, file_bytes,
-                                    file_options={"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})
+    sb.storage.from_(BUCKET).upload(
+        XLSX_PATH, file_bytes,
+        file_options={
+            "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "upsert": "true",
+        },
+    )
 
 
 # ── SUBCONTRACTORS ─────────────────────────────────────────────
