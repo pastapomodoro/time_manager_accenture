@@ -1,1 +1,88 @@
-{}
+{
+  "prova": {
+    "meta": {
+      "start_date": "2026-05-07",
+      "deadline": "2026-05-07",
+      "team_scope": [
+        "Manuel Ricciardi",
+        "Alvar S. Rodriguez",
+        "Elisa Righi",
+        "Andrea Zini",
+        "Eugenio Bellini",
+        "Giulia Maria Triulzi",
+        "Lucia Marina Tomasi",
+        "Filippo Audino",
+        "Martina Lorini",
+        "Anna Zonca"
+      ],
+      "chargeable": true,
+      "excel_b64": "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"
+    },
+    "rows": [
+      {
+        "sottocategoria": "CUSTOM",
+        "nome_lavorazione": "AI Image Generation",
+        "skill_richiesta": "retouch",
+        "unita_ora": 1.0,
+        "quantita": 100,
+        "assegnato_a": "Andrea Zini, Eugenio Bellini"
+      },
+      {
+        "sottocategoria": "CUSTOM",
+        "nome_lavorazione": "Image Post-production",
+        "skill_richiesta": "retouch",
+        "unita_ora": 1.2,
+        "quantita": 10,
+        "assegnato_a": "Elisa Righi, Andrea Zini"
+      },
+      {
+        "sottocategoria": "CUSTOM",
+        "nome_lavorazione": "Photo Color Correction",
+        "skill_richiesta": "compositing",
+        "unita_ora": 2.0,
+        "quantita": 29,
+        "assegnato_a": "Alvar S. Rodriguez, Elisa Righi"
+      },
+      {
+        "sottocategoria": "CUSTOM",
+        "nome_lavorazione": "Static Frame Animation",
+        "skill_richiesta": "retouch",
+        "unita_ora": 7.0,
+        "quantita": 20,
+        "assegnato_a": "Alvar S. Rodriguez, Elisa Righi"
+      },
+      {
+        "sottocategoria": "CUSTOM",
+        "nome_lavorazione": "Animation Post-production",
+        "skill_richiesta": "compositing",
+        "unita_ora": 1.5,
+        "quantita": 0,
+        "assegnato_a": ""
+      },
+      {
+        "sottocategoria": "CUSTOM",
+        "nome_lavorazione": "AI Video Generation",
+        "skill_richiesta": "video",
+        "unita_ora": 0.5,
+        "quantita": 0,
+        "assegnato_a": ""
+      },
+      {
+        "sottocategoria": "CUSTOM",
+        "nome_lavorazione": "Video Post-production",
+        "skill_richiesta": "compositing",
+        "unita_ora": 1.0,
+        "quantita": 0,
+        "assegnato_a": ""
+      },
+      {
+        "sottocategoria": "CUSTOM",
+        "nome_lavorazione": "Video Color Correction",
+        "skill_richiesta": "compositing",
+        "unita_ora": 1.3,
+        "quantita": 0,
+        "assegnato_a": ""
+      }
+    ]
+  }
+}

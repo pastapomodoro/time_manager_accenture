@@ -247,15 +247,19 @@ RETRY_MULTIPLIER = 4
 SUBCO_COLOR      = "#EC4899"
 
 GANTT_COLORS: dict[str, str] = {
-    "GENERATION":       "#3B82F6",   # blue  — AI image / static generation
-    "POST-PRODUCTION":  "#EC4899",   # pink  — post-production image
-    "COLOR CORRECTION": "#F97316",   # orange
-    "ANIMATION":        "#A855F7",   # purple — frame animation
-    "VIDEO":            "#22C55E",   # green — AI video generation
-    "POST-PROD":        "#EC4899",   # pink  (alias for post-production)
-    "EDITING":          "#8B5CF6",   # violet
+    "GENERATION":       "#3B82F6",   # sky blue
+    "POST-PRODUCTION":  "#EC4899",   # fuchsia
+    "COLOR CORRECTION": "#22C55E",   # fresh green
+    "ANIMATION":        "#A855F7",   # violet
+    "VIDEO":            "#06B6D4",   # cyan
+    "POST-PROD":        "#EC4899",   # alias
+    "EDITING":          "#F59E0B",   # amber
 }
-GANTT_COLOR_DEFAULT = "#6B7280"
+GANTT_COLOR_DEFAULT = "#60A5FA"
+GANTT_PALETTE = [
+    "#3B82F6", "#06B6D4", "#22C55E", "#84CC16", "#A855F7",
+    "#EC4899", "#F59E0B", "#FB7185", "#14B8A6", "#8B5CF6",
+]
 
 # Per-task name overrides (matched before fase)
 _GANTT_NAME_COLORS: dict[str, str] = {
@@ -283,7 +287,9 @@ def gantt_color(nome: str, fase: str = "") -> str:
     for pattern, color in GANTT_COLORS.items():
         if pattern in key2 or pattern in key:
             return color
-    return GANTT_COLOR_DEFAULT
+    seed = key2 or key or "DEFAULT"
+    idx = sum(ord(ch) for ch in seed) % len(GANTT_PALETTE)
+    return GANTT_PALETTE[idx] if GANTT_PALETTE else GANTT_COLOR_DEFAULT
 
 _XLSX_ENV = os.environ.get("AI_TEAM_DATA_XLSX", "").strip()
 DEFAULT_XLSX = (
@@ -2264,8 +2270,6 @@ with tab_job:
         st.session_state.preset_data = {}
     if "job_editor_version" not in st.session_state:
         st.session_state.job_editor_version = 0
-    if "gantt_phase_colors" not in st.session_state:
-        st.session_state.gantt_phase_colors = {}
     if load_clicked and preset_sel != "— none —":
         pdata = presets[preset_sel]
         st.session_state.preset_data = pdata
@@ -2277,8 +2281,6 @@ with tab_job:
             st.session_state.preset_excel_bytes = base64.b64decode(_pmeta["excel_b64"])
         else:
             st.session_state.pop("preset_excel_bytes", None)
-        # Restore gantt color overrides
-        st.session_state.gantt_phase_colors = _pmeta.get("gantt_phase_colors", {})
         st.toast(f"Preset «{preset_sel}» loaded")
         st.rerun()
     if del_clicked and preset_sel != "— none —":
@@ -2289,7 +2291,6 @@ with tab_job:
         st.session_state.preset_sel = "— none —"
         st.session_state.preset_data = {}
         st.session_state.pop("preset_excel_bytes", None)
-        st.session_state.pop("gantt_phase_colors", None)
         st.session_state.job_editor_version += 1
         st.toast(f"Preset «{preset_sel}» deleted")
         st.rerun()
@@ -2465,7 +2466,6 @@ with tab_job:
             "deadline": deadline_value.isoformat(),
             "team_scope": team_scope,
             "chargeable": chargeable,
-            "gantt_phase_colors": st.session_state.get("gantt_phase_colors", {}),
         }
         # Embed current Excel file so this preset stays self-contained
         _fb = st.session_state.get("preset_excel_bytes") or file_bytes
@@ -2508,23 +2508,12 @@ with tab_job:
         if "gantt_positions" not in st.session_state:
             st.session_state.gantt_positions = {}
 
-        # Color pickers per unique phase
-        unique_phases = list(dict.fromkeys(it["fase"] for it in job_items if it.get("fase")))
-        if unique_phases:
-            with st.expander("Customize bar colors", expanded=False):
-                _cols = st.columns(min(len(unique_phases), 4))
-                for _pi, _fase in enumerate(unique_phases):
-                    _default = st.session_state.gantt_phase_colors.get(_fase) or gantt_color("", _fase)
-                    _picked = _cols[_pi % 4].color_picker(_fase or "Default", value=_default,
-                                                           key=f"gcolor_{_fase}")
-                    st.session_state.gantt_phase_colors[_fase] = _picked
-
         gantt_html = build_gantt_html(
             job_items=job_items,
             start_date=start_date,
             gantt_positions=st.session_state.gantt_positions,
             deadline=deadline_value,
-            color_overrides=st.session_state.get("gantt_phase_colors", {}),
+            color_overrides={},
         )
         gantt_height = len(job_items) * 72 + 100
         components.html(gantt_html, height=gantt_height, scrolling=False)

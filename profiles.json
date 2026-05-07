@@ -1,92 +1,102 @@
 [
   {
+    "id": 1,
     "nome": "Manuel Ricciardi",
     "ruolo": "Senior Graphic Designer",
     "seniority": "senior",
-    "costo_orario": 15.0,
+    "costo_lcr": 27.37,
+    "costo_ucr": 21.85,
     "skill_tags": "retouch,compositing,lighting",
-    "disponibilita_h_settimana": 40.0,
-    "id": 1
+    "disponibilita_h_settimana": 40.0
   },
   {
+    "id": 2,
     "nome": "Alvar S. Rodriguez",
     "ruolo": "Senior Graphic Designer",
     "seniority": "senior",
-    "costo_orario": 15.0,
+    "costo_lcr": 28.23,
+    "costo_ucr": 19.6,
     "skill_tags": "retouch,compositing,lighting",
-    "disponibilita_h_settimana": 40.0,
-    "id": 2
+    "disponibilita_h_settimana": 40.0
   },
   {
+    "id": 3,
     "nome": "Elisa Righi",
     "ruolo": "Senior Graphic Designer",
     "seniority": "senior",
-    "costo_orario": 15.0,
+    "costo_lcr": 36.68,
+    "costo_ucr": 24.94,
     "skill_tags": "retouch,compositing,lighting",
-    "disponibilita_h_settimana": 40.0,
-    "id": 3
+    "disponibilita_h_settimana": 40.0
   },
   {
+    "id": 4,
     "nome": "Andrea Zini",
     "ruolo": "Senior Graphic Designer",
     "seniority": "senior",
-    "costo_orario": 15.0,
+    "costo_lcr": 30.42,
+    "costo_ucr": 24.94,
     "skill_tags": "retouch,compositing,lighting",
-    "disponibilita_h_settimana": 40.0,
-    "id": 4
+    "disponibilita_h_settimana": 40.0
   },
   {
+    "id": 5,
     "nome": "Eugenio Bellini",
-    "ruolo": "Junior Graphic Designer",
+    "ruolo": "Intern",
     "seniority": "junior",
-    "costo_orario": 8.0,
+    "costo_lcr": 0.0,
+    "costo_ucr": 0.0,
     "skill_tags": "retouch,prompt",
-    "disponibilita_h_settimana": 40.0,
-    "id": 5
+    "disponibilita_h_settimana": 40.0
   },
   {
+    "id": 6,
     "nome": "Giulia Maria Triulzi",
-    "ruolo": "Junior Graphic Designer",
+    "ruolo": "Intern",
     "seniority": "junior",
-    "costo_orario": 8.0,
+    "costo_lcr": 0.0,
+    "costo_ucr": 0.0,
     "skill_tags": "retouch,prompt",
-    "disponibilita_h_settimana": 40.0,
-    "id": 6
+    "disponibilita_h_settimana": 40.0
   },
   {
+    "id": 7,
     "nome": "Lucia Marina Tomasi",
-    "ruolo": "Junior Graphic Designer",
+    "ruolo": "Intern",
     "seniority": "junior",
-    "costo_orario": 8.0,
+    "costo_lcr": 0.0,
+    "costo_ucr": 0.0,
     "skill_tags": "retouch,prompt",
-    "disponibilita_h_settimana": 40.0,
-    "id": 7
+    "disponibilita_h_settimana": 40.0
   },
   {
+    "id": 8,
     "nome": "Filippo Audino",
-    "ruolo": "Junior Graphic Designer",
+    "ruolo": "Intern",
     "seniority": "junior",
-    "costo_orario": 8.0,
+    "costo_lcr": 0.0,
+    "costo_ucr": 0.0,
     "skill_tags": "retouch,prompt",
-    "disponibilita_h_settimana": 40.0,
-    "id": 8
+    "disponibilita_h_settimana": 40.0
   },
   {
+    "id": 9,
     "nome": "Martina Lorini",
-    "ruolo": "Junior Graphic Designer",
+    "ruolo": "Intern",
     "seniority": "junior",
-    "costo_orario": 8.0,
+    "costo_lcr": 0.0,
+    "costo_ucr": 0.0,
     "skill_tags": "retouch,prompt",
-    "disponibilita_h_settimana": 40.0,
-    "id": 9
+    "disponibilita_h_settimana": 40.0
   },
   {
+    "id": 10,
     "nome": "Anna Zonca",
-    "ruolo": "Junior Graphic Designer",
+    "ruolo": "Intern",
     "seniority": "junior",
-    "costo_orario": 8.0,
+    "costo_lcr": 0.0,
+    "costo_ucr": 0.0,
     "skill_tags": "retouch,prompt",
-    "disponibilita_h_settimana": 40.0,
-    "id": 10
+    "disponibilita_h_settimana": 40.0
   }
 ]
